@@ -1,0 +1,32 @@
+{
+    "dbRover.connections": [
+        {
+            "name": "localhost",
+            "kind": "mysql",
+            "host": "localhost",
+            "port": 3306,
+            "user": "sail",
+            "ssl": false,
+            "id": "localhost"
+        },
+        {
+            "name": "rds.izumikinzoku.com",
+            "kind": "postgres",
+            "host": "rds.izumikinzoku.com",
+            "port": 5432,
+            "user": "izum",
+            "ssl": true,
+            "id": "rds-izumikinzoku-com"
+        },
+        {
+            "name": "ucw-production",
+            "kind": "mysql",
+            "host": "localhost",
+            "port": 33062,
+            "database": "ucarworld",
+            "user": "ucarworld",
+            "ssl": false,
+            "id": "ucw-production"
+        }
+    ]
+}

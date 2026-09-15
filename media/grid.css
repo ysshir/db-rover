@@ -1,0 +1,650 @@
+:root {
+  --dbrover-row-height: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-foreground);
+  font-family: var(--vscode-font-family, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.dbrover-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  flex-wrap: wrap;
+}
+
+.dbrover-toolbar .dbrover-spacer {
+  flex: 1;
+}
+
+.dbrover-toolbar .dbrover-info {
+  color: var(--vscode-descriptionForeground);
+}
+
+button.dbrover-btn {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 4px 10px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+button.dbrover-btn:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+button.dbrover-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.dbrover-btn.secondary {
+  background-color: transparent;
+  color: var(--vscode-foreground);
+  border: 1px solid var(--vscode-panel-border);
+}
+
+/* 取り消しのきかない操作（破棄・削除）を確定するボタン。 */
+button.dbrover-btn.danger {
+  background-color: var(--vscode-inputValidation-errorBackground, #a1260d);
+  color: var(--vscode-button-foreground);
+}
+
+button.dbrover-btn.danger:hover {
+  background-color: var(--vscode-inputValidation-errorBorder, #be1100);
+}
+
+select.dbrover-select,
+input.dbrover-input {
+  background-color: var(--vscode-input-background, var(--vscode-editor-background));
+  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+  padding: 2px 4px;
+  font-size: inherit;
+}
+
+.dbrover-grid-container {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+/* tabindex="0" の既定フォーカスリングは表全体を囲ってしまい邪魔なので出さない。
+   いまどこにいるかは選択セルの十字ハイライトで分かる。 */
+.dbrover-grid-container:focus,
+.dbrover-grid-container:focus-visible {
+  outline: none;
+}
+
+table.dbrover-table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: max-content;
+  min-width: 100%;
+}
+
+.dbrover-thead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background-color: var(--vscode-editor-background);
+}
+
+th.dbrover-th {
+  position: relative;
+  border: 1px solid var(--vscode-panel-border);
+  padding: 3px 6px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  user-select: none;
+  cursor: pointer;
+  background-color: var(--vscode-editor-background);
+}
+
+th.dbrover-th.pinned,
+td.dbrover-td.pinned {
+  position: sticky;
+  z-index: 2;
+  background-color: var(--vscode-editor-background);
+}
+
+.dbrover-th-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dbrover-sort-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  height: 14px;
+  font-size: 10px;
+  border-radius: 7px;
+  background-color: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  padding: 0 3px;
+}
+
+.dbrover-resizer {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+}
+
+/* 行番号列。横スクロールしても左端に貼り付くよう sticky にする。 */
+th.dbrover-rownum,
+td.dbrover-rownum {
+  position: sticky;
+  left: 0;
+  border: 1px solid var(--vscode-panel-border);
+  padding: 3px 6px;
+  text-align: right;
+  white-space: nowrap;
+  user-select: none;
+  background-color: var(--vscode-editor-background);
+  color: var(--vscode-editorLineNumber-foreground, var(--vscode-descriptionForeground));
+  font-variant-numeric: tabular-nums;
+}
+
+td.dbrover-rownum {
+  z-index: 2;
+  cursor: default;
+  height: var(--dbrover-row-height);
+}
+
+th.dbrover-rownum {
+  z-index: 4;
+  cursor: default;
+}
+
+/* 選択中の行の番号だけは前景色を上げて、いま何行目にいるかを読みやすくする。 */
+td.dbrover-rownum.row-selected {
+  color: var(--vscode-editorLineNumber-activeForeground, var(--vscode-foreground));
+}
+
+td.dbrover-td {
+  border: 1px solid var(--vscode-panel-border);
+  padding: 3px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  height: var(--dbrover-row-height);
+}
+
+td.dbrover-td.numeric {
+  text-align: right;
+}
+
+td.dbrover-td.null-value {
+  font-style: italic;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* 選択中のセルが属する行と列を薄く色づけして、いまどこにいるかを十字で示す。
+   列方向は行方向より一段弱くして、視線が行に向くようにする。
+   透過ではなく編集背景と混ぜるのは、固定列・行番号列が sticky で
+   下を他の行が通過するため（半透明だと透けてしまう）。 */
+th.dbrover-th.column-selected,
+td.dbrover-td.column-selected {
+  background-color: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.14));
+  background-color: color-mix(
+    in srgb,
+    var(--vscode-list-inactiveSelectionBackground, #808080) 45%,
+    var(--vscode-editor-background, transparent)
+  );
+}
+
+td.dbrover-td.row-selected,
+td.dbrover-rownum.row-selected {
+  background-color: var(--vscode-list-inactiveSelectionBackground, rgba(128, 128, 128, 0.14));
+}
+
+th.dbrover-th.column-selected {
+  border-bottom-color: var(--vscode-focusBorder);
+}
+
+td.dbrover-td.selected {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+  background-color: var(--vscode-list-activeSelectionBackground, var(--vscode-list-inactiveSelectionBackground));
+  color: var(--vscode-list-activeSelectionForeground, inherit);
+}
+
+/* ホバーは十字ハイライトを打ち消さないよう、選択中の行・列以外にだけ効かせる。 */
+tr.dbrover-row:hover td.dbrover-td:not(.column-selected):not(.row-selected) {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+td.dbrover-td.pending-edit {
+  background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(155, 185, 85, 0.2));
+  position: relative;
+}
+
+td.dbrover-td.pending-edit::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-style: solid;
+  border-width: 6px 6px 0 0;
+  border-color: var(--vscode-editorWarning-foreground, orange) transparent transparent transparent;
+}
+
+/* 削除候補の行。保存するまでは DB に触っていないので、赤い見た目だけで示す。 */
+tr.dbrover-row.pending-delete td.dbrover-td {
+  background-color: var(--vscode-diffEditor-removedTextBackground, rgba(255, 80, 80, 0.2));
+  color: var(--vscode-errorForeground, inherit);
+  text-decoration: line-through;
+}
+
+tr.dbrover-row.pending-delete td.dbrover-td.selected {
+  outline-color: var(--vscode-errorForeground, red);
+}
+
+td.dbrover-td input.dbrover-cell-editor {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: 1px solid var(--vscode-focusBorder);
+  background-color: var(--vscode-input-background, var(--vscode-editor-background));
+  color: var(--vscode-input-foreground, var(--vscode-foreground));
+  font: inherit;
+  padding: 0 2px;
+}
+
+.dbrover-context-menu {
+  position: fixed;
+  z-index: 100;
+  background-color: var(--vscode-menu-background, var(--vscode-editor-background));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-panel-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  min-width: 200px;
+  padding: 4px 0;
+}
+
+.dbrover-context-menu-item {
+  padding: 4px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dbrover-context-menu-item:hover {
+  background-color: var(--vscode-list-hoverBackground);
+}
+
+.dbrover-context-menu-item.disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dbrover-context-menu-item.disabled:hover {
+  background-color: transparent;
+}
+
+.dbrover-warning-bar {
+  padding: 4px 8px;
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.15));
+  color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
+  border-bottom: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-panel-border));
+}
+
+/* --- クエリ結果パネル：複数文の結果セレクタ --- */
+
+select.dbrover-statement-select {
+  max-width: 360px;
+}
+
+/* エラーの文を選択中は目立たせ、未実行（skipped）の文は淡く見せる。 */
+select.dbrover-statement-select.status-error {
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  color: var(--vscode-errorForeground, var(--vscode-foreground));
+}
+
+select.dbrover-statement-select.status-skipped {
+  color: var(--vscode-descriptionForeground);
+}
+
+.dbrover-overall-summary {
+  padding: 4px 8px;
+  color: var(--vscode-descriptionForeground);
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.dbrover-overall-summary.has-error {
+  background-color: var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.15));
+  color: var(--vscode-inputValidation-warningForeground, var(--vscode-foreground));
+  border-bottom-color: var(--vscode-inputValidation-warningBorder, var(--vscode-panel-border));
+}
+
+.dbrover-error-message {
+  margin: 4px 8px;
+  padding: 8px;
+  background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+  border: 1px solid var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  color: var(--vscode-errorForeground, var(--vscode-foreground));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dbrover-skipped-message {
+  padding: 8px;
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.dbrover-sql-block {
+  font-family: var(--vscode-editor-font-family, monospace);
+  background-color: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+  padding: 6px;
+  margin: 4px 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border-radius: 2px;
+}
+
+.dbrover-sql-block.danger {
+  border-left: 3px solid var(--vscode-errorForeground, red);
+  color: var(--vscode-errorForeground, inherit);
+}
+
+/* モーダルは開閉ともふわっとさせる。閉じるときは .closing を付けてから
+   animationend で DOM から外す（media/table-view.js の showModal）。 */
+@keyframes dbrover-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dbrover-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dbrover-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: dbrover-backdrop-in 140ms ease-out;
+}
+
+.dbrover-modal {
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border);
+  width: min(720px, 90vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: dbrover-modal-in 180ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+@keyframes dbrover-backdrop-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes dbrover-modal-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+
+/* 閉じるアニメーション中は操作を受け付けない（二重クリックで確定させないため）。 */
+.dbrover-modal-backdrop.closing {
+  animation: dbrover-backdrop-out 130ms ease-in forwards;
+  pointer-events: none;
+}
+
+.dbrover-modal-backdrop.closing .dbrover-modal {
+  animation: dbrover-modal-out 130ms ease-in forwards;
+}
+
+/* OS 側でアニメーションを抑制している場合は即座に出し入れする。 */
+@media (prefers-reduced-motion: reduce) {
+  .dbrover-modal-backdrop,
+  .dbrover-modal,
+  .dbrover-modal-backdrop.closing,
+  .dbrover-modal-backdrop.closing .dbrover-modal {
+    animation: none;
+  }
+}
+
+.dbrover-modal-header {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  font-weight: 600;
+}
+
+.dbrover-modal-body {
+  padding: 8px 12px;
+  overflow: auto;
+  flex: 1;
+}
+
+.dbrover-modal-footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--vscode-panel-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dbrover-details-collapsible summary {
+  cursor: pointer;
+  color: var(--vscode-descriptionForeground);
+  padding: 4px 8px;
+}
+
+/* --- 接続エディタ（入力・編集モーダル） --- */
+
+.dbrover-modal-footer .dbrover-spacer {
+  flex: 1;
+}
+
+.dbrover-editor {
+  width: min(560px, 92vw);
+}
+
+.dbrover-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dbrover-form-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.dbrover-form-label {
+  color: var(--vscode-descriptionForeground);
+  text-align: right;
+}
+
+.dbrover-form-row .dbrover-input,
+.dbrover-form-row .dbrover-select {
+  width: 100%;
+  padding: 4px 6px;
+}
+
+.dbrover-form-control {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dbrover-file-control {
+  flex-direction: row;
+  align-items: center;
+}
+
+.dbrover-form-hint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+.dbrover-sqlite-fields .dbrover-form-hint,
+.dbrover-server-fields .dbrover-form-hint {
+  padding-left: 148px;
+}
+
+.dbrover-form-control .dbrover-form-hint {
+  padding-left: 0;
+}
+
+.dbrover-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.dbrover-checkbox input {
+  margin: 0;
+}
+
+.dbrover-server-fields,
+.dbrover-sqlite-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dbrover-editor-status {
+  margin-top: 12px;
+  padding: 6px 8px;
+  border-radius: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dbrover-editor-status.is-info {
+  background-color: var(--vscode-inputValidation-infoBackground, transparent);
+  border: 1px solid var(--vscode-inputValidation-infoBorder, var(--vscode-panel-border));
+}
+
+.dbrover-editor-status.is-error {
+  background-color: var(--vscode-inputValidation-errorBackground, transparent);
+  border: 1px solid var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  color: var(--vscode-errorForeground);
+}
+
+/* --- WHERE 式の入力バーと列名サジェスト --- */
+
+.dbrover-where-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.dbrover-where-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.dbrover-where-input {
+  width: 100%;
+  padding: 3px 6px;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.dbrover-where-input.is-active {
+  border-color: var(--vscode-focusBorder);
+}
+
+.dbrover-suggest {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 260px;
+  max-width: 100%;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 120;
+  background-color: var(--vscode-editorSuggestWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-panel-border));
+}
+
+.dbrover-suggest-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dbrover-suggest-item.active {
+  background-color: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+  color: var(--vscode-list-activeSelectionForeground, inherit);
+}
+
+.dbrover-suggest-name {
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.dbrover-suggest-meta {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
+.dbrover-suggest-item.active .dbrover-suggest-meta {
+  color: inherit;
+  opacity: 0.8;
+}

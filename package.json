@@ -1,0 +1,677 @@
+{
+  "name": "db-rover",
+  "displayName": "DB Rover",
+  "description": "サイドバーからデータベースを探索し、SQL を実行して結果を確認できる VS Code 拡張機能",
+  "version": "0.1.0",
+  "publisher": "leptosystem",
+  "private": true,
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "dbRover.addConnection",
+        "title": "接続を追加",
+        "category": "DB Rover",
+        "icon": "$(add)"
+      },
+      {
+        "command": "dbRover.editConnection",
+        "title": "接続を編集",
+        "category": "DB Rover",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "dbRover.removeConnection",
+        "title": "接続を削除",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.connect",
+        "title": "接続",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.disconnect",
+        "title": "切断",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.refresh",
+        "title": "再読み込み",
+        "category": "DB Rover",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dbRover.newQuery",
+        "title": "SQL エディタを開く",
+        "category": "DB Rover",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "dbRover.runQuery",
+        "title": "クエリを実行（カーソル位置の SQL）",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.previewTableData",
+        "title": "データをプレビュー",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.openTable",
+        "title": "テーブルを開く",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.copyName",
+        "title": "名前をコピー",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.selectActiveConnection",
+        "title": "アクティブ接続を選択",
+        "category": "DB Rover",
+        "icon": "$(database)"
+      },
+      {
+        "command": "dbRover.saveTableEdits",
+        "title": "テーブルの変更を保存",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.runStatement",
+        "title": "この SQL を実行",
+        "category": "DB Rover",
+        "icon": "$(play)"
+      },
+      {
+        "command": "dbRover.focusOrRunStatement",
+        "title": "DB Rover: カーソル位置の文をハイライト／実行",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.runFocusedStatement",
+        "title": "DB Rover: ハイライト中の文を実行",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.clearStatementFocus",
+        "title": "DB Rover: 文のハイライトを解除",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.runStatementsFrom",
+        "title": "ここから下の SQL をすべて実行",
+        "category": "DB Rover",
+        "icon": "$(run-below)"
+      },
+      {
+        "command": "dbRover.runAllStatements",
+        "title": "すべての SQL を実行",
+        "category": "DB Rover",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "dbRover.selectDocumentConnection",
+        "title": "このエディタの接続先を選択",
+        "category": "DB Rover",
+        "icon": "$(database)"
+      },
+      {
+        "command": "dbRover.openWalkthrough",
+        "title": "はじめに（使い方）",
+        "category": "DB Rover"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "db-rover",
+          "title": "DB Rover",
+          "icon": "media/db-rover.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "db-rover-panel",
+          "title": "DB Rover",
+          "icon": "media/db-rover.svg"
+        }
+      ]
+    },
+    "views": {
+      "db-rover": [
+        {
+          "id": "dbRover.connections",
+          "name": "接続"
+        }
+      ],
+      "db-rover-panel": [
+        {
+          "id": "dbRover.queryResult",
+          "name": "クエリ結果",
+          "type": "webview",
+          "contextualTitle": "DB Rover: クエリ結果"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "dbRover.refresh",
+          "when": "view == dbRover.connections",
+          "group": "navigation"
+        },
+        {
+          "command": "dbRover.addConnection",
+          "when": "view == dbRover.connections",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dbRover.newQuery",
+          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected)",
+          "group": "inline@0"
+        },
+        {
+          "command": "dbRover.connect",
+          "when": "view == dbRover.connections && viewItem == connection.disconnected",
+          "group": "inline"
+        },
+        {
+          "command": "dbRover.disconnect",
+          "when": "view == dbRover.connections && viewItem == connection.connected",
+          "group": "inline"
+        },
+        {
+          "command": "dbRover.previewTableData",
+          "when": "view == dbRover.connections && (viewItem == table || viewItem == view)",
+          "group": "inline"
+        },
+        {
+          "command": "dbRover.copyName",
+          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected || viewItem == schema || viewItem == table || viewItem == view || viewItem == column || viewItem == index)",
+          "group": "1_copy"
+        },
+        {
+          "command": "dbRover.editConnection",
+          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected)",
+          "group": "2_modify@1"
+        },
+        {
+          "command": "dbRover.removeConnection",
+          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected)",
+          "group": "2_modify@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "dbRover.runQuery",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "dbRover.runStatement",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "dbRover.focusOrRunStatement",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "dbRover.runFocusedStatement",
+          "when": "false"
+        },
+        {
+          "command": "dbRover.clearStatementFocus",
+          "when": "false"
+        },
+        {
+          "command": "dbRover.runStatementsFrom",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "dbRover.runAllStatements",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "dbRover.selectDocumentConnection",
+          "when": "editorLangId == sql"
+        },
+        {
+          "command": "dbRover.selectActiveConnection"
+        },
+        {
+          "command": "dbRover.openWalkthrough"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "dbRover.runStatement",
+          "when": "editorLangId == sql",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dbRover.runAllStatements",
+          "when": "editorLangId == sql",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dbRover.selectDocumentConnection",
+          "when": "editorLangId == sql",
+          "group": "navigation@3"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "dbRover.runStatement",
+          "when": "editorLangId == sql",
+          "group": "dbRover@1"
+        },
+        {
+          "command": "dbRover.runStatementsFrom",
+          "when": "editorLangId == sql",
+          "group": "dbRover@2"
+        },
+        {
+          "command": "dbRover.runAllStatements",
+          "when": "editorLangId == sql",
+          "group": "dbRover@3"
+        },
+        {
+          "command": "dbRover.selectDocumentConnection",
+          "when": "editorLangId == sql",
+          "group": "dbRover@4"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "dbRover.focusOrRunStatement",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorLangId == sql"
+      },
+      {
+        "command": "dbRover.runFocusedStatement",
+        "key": "enter",
+        "when": "editorTextFocus && editorLangId == sql && dbRover.statementFocused && !suggestWidgetVisible && !inlineSuggestionVisible && !renameInputVisible && !parameterHintsVisible && !inSnippetMode && !editorHasMultipleSelections"
+      },
+      {
+        "command": "dbRover.clearStatementFocus",
+        "key": "escape",
+        "when": "editorTextFocus && editorLangId == sql && dbRover.statementFocused"
+      },
+      {
+        "command": "dbRover.runAllStatements",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorLangId == sql"
+      },
+      {
+        "command": "dbRover.saveTableEdits",
+        "key": "ctrl+s",
+        "mac": "cmd+s",
+        "when": "activeWebviewPanelId == dbRover.tableView"
+      }
+    ],
+    "configuration": {
+      "title": "DB Rover",
+      "properties": {
+        "dbRover.connections": {
+          "type": "array",
+          "default": [],
+          "description": "DB Rover の接続定義の一覧。パスワードは SecretStorage に保存され、ここには書きません。",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "接続の一意な識別子。省略すると name から自動生成されます。"
+              },
+              "name": {
+                "type": "string",
+                "description": "接続の表示名"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "postgres",
+                  "mysql",
+                  "sqlite"
+                ],
+                "description": "データベースの種類"
+              },
+              "host": {
+                "type": "string",
+                "description": "ホスト名（postgres / mysql）"
+              },
+              "port": {
+                "type": "number",
+                "description": "ポート番号（postgres / mysql）"
+              },
+              "database": {
+                "type": "string",
+                "description": "データベース名（postgres / mysql）"
+              },
+              "user": {
+                "type": "string",
+                "description": "ユーザー名（postgres / mysql）"
+              },
+              "ssl": {
+                "type": "boolean",
+                "description": "SSL 接続を使用するか（postgres / mysql）"
+              },
+              "file": {
+                "type": "string",
+                "description": "SQLite ファイルのパス（ワークスペース相対・絶対・~ 展開に対応）"
+              }
+            },
+            "required": [
+              "name",
+              "kind"
+            ]
+          }
+        },
+        "dbRover.queryRowLimit": {
+          "type": "number",
+          "default": 500,
+          "description": "結果グリッドに表示する最大行数"
+        },
+        "dbRover.autoConnectOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "起動時にすべての接続を自動的に接続するか"
+        },
+        "dbRover.pageSize": {
+          "type": "number",
+          "default": 200,
+          "description": "テーブルビューの 1 ページあたりの行数"
+        },
+        "dbRover.countRows": {
+          "type": "boolean",
+          "default": true,
+          "description": "テーブルビューで総行数（COUNT）を取得するか。大きなテーブルで遅い場合は無効にしてください。"
+        },
+        "dbRover.keybindings": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": false,
+          "markdownDescription": "グリッド内のキー割り当てを上書きします。値は `\"ctrl+n\"` のような文字列か、その配列です。修飾子は `ctrl` / `shift` / `alt` / `cmd`、`mod` は macOS で `cmd`・それ以外で `ctrl` になります。書かなかったアクションは既定のままです。保存（既定 `Cmd/Ctrl+S`）は VS Code のキーボードショートカット設定（`dbRover.saveTableEdits`）で変更してください。",
+          "properties": {
+            "edit": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "選択セルを編集モードにする（既定: enter / f2）"
+            },
+            "moveUp": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "1 つ上のセルへ移動（既定: arrowup / ctrl+p）"
+            },
+            "moveDown": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "1 つ下のセルへ移動（既定: arrowdown / ctrl+n）"
+            },
+            "moveLeft": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "1 つ左のセルへ移動（既定: arrowleft / ctrl+b）"
+            },
+            "moveRight": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "1 つ右のセルへ移動（既定: arrowright / ctrl+f）"
+            },
+            "moveRowStart": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "行の一番左の列へ移動（既定: home / ctrl+a）"
+            },
+            "moveRowEnd": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "行の一番右の列へ移動（既定: end / ctrl+e）"
+            },
+            "moveTop": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "先頭行へ移動（既定: ctrl+home / mod+arrowup）"
+            },
+            "moveBottom": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "末尾行へ移動（既定: ctrl+end / mod+arrowdown）"
+            },
+            "pageUp": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "1 画面ぶん上へ移動（既定: pageup）"
+            },
+            "pageDown": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "1 画面ぶん下へ移動（既定: pagedown）"
+            },
+            "copy": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "選択セルの値をコピー（既定: mod+c）"
+            },
+            "setNull": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "選択セルを NULL に設定（既定: alt+n）"
+            },
+            "deleteRow": {
+              "type": [
+                "string",
+                "array"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "description": "選択行の削除候補を切り替え（既定: ctrl+d / delete / backspace）"
+            }
+          }
+        },
+        "dbRover.showStatementCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "SQL エディタで、文ごとに実行用の CodeLens（▷ 実行）を表示するか"
+        },
+        "dbRover.stopOnError": {
+          "type": "boolean",
+          "default": true,
+          "description": "複数の SQL を続けて実行しているときにエラーが起きたら、以降の SQL を実行せず中断するか"
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "dbRover.statementFocusBackground",
+        "description": "実行対象としてハイライト中の SQL 文の背景色",
+        "defaults": {
+          "dark": "#3794ff33",
+          "light": "#0066bf26",
+          "highContrast": "#3794ff4d",
+          "highContrastLight": "#0066bf3d"
+        }
+      },
+      {
+        "id": "dbRover.statementFocusBorder",
+        "description": "ハイライト中の SQL 文の左端のバーと「Enter で実行」バッジの色",
+        "defaults": {
+          "dark": "#3794ff",
+          "light": "#0066bf",
+          "highContrast": "#3794ff",
+          "highContrastLight": "#0066bf"
+        }
+      },
+      {
+        "id": "dbRover.statementFocusHintForeground",
+        "description": "「Enter で実行」バッジの文字色",
+        "defaults": {
+          "dark": "#ffffff",
+          "light": "#ffffff",
+          "highContrast": "#000000",
+          "highContrastLight": "#ffffff"
+        }
+      }
+    ],
+    "walkthroughs": [
+      {
+        "id": "dbRover.gettingStarted",
+        "title": "DB Rover をはじめる",
+        "description": "接続を追加して、テーブルを眺め、SQL を実行するまで。",
+        "steps": [
+          {
+            "id": "dbRover.addConnection",
+            "title": "接続を追加する",
+            "description": "PostgreSQL / MySQL(MariaDB) / SQLite に接続します。パスワードは SecretStorage に保存され、settings.json には書き込まれません。\n[接続を追加](command:dbRover.addConnection)",
+            "media": {
+              "markdown": "walkthrough/add-connection.md"
+            },
+            "completionEvents": [
+              "onCommand:dbRover.addConnection"
+            ]
+          },
+          {
+            "id": "dbRover.exploreTree",
+            "title": "ツリーからテーブルを開く",
+            "description": "サイドバーで スキーマ → テーブル → カラム を辿れます。テーブル名をクリックすると、閲覧・編集できるテーブルビューが開きます。\n[サイドバーを開く](command:workbench.view.extension.db-rover)",
+            "media": {
+              "markdown": "walkthrough/explore.md"
+            },
+            "completionEvents": [
+              "onCommand:dbRover.openTable"
+            ]
+          },
+          {
+            "id": "dbRover.runSql",
+            "title": "SQL を実行する",
+            "description": "Cmd/Ctrl+Enter で対象の文がハイライトされ、続けて Enter で実行します。各文の上の ▷ 実行 でも同じです。\n[SQL エディタを開く](command:dbRover.newQuery)",
+            "media": {
+              "markdown": "walkthrough/run-sql.md"
+            },
+            "completionEvents": [
+              "onCommand:dbRover.newQuery"
+            ]
+          },
+          {
+            "id": "dbRover.connectionComment",
+            "title": "実行先を確かめる",
+            "description": "SQL エディタの実行先は 1 行目のコメントに記録されます。ステータスバーか先頭の CodeLens をクリックすると選び直せます。",
+            "media": {
+              "markdown": "walkthrough/connection-comment.md"
+            },
+            "completionEvents": [
+              "onCommand:dbRover.selectDocumentConnection"
+            ]
+          }
+        ]
+      }
+    ],
+    "viewsWelcome": [
+      {
+        "view": "dbRover.connections",
+        "contents": "接続がまだありません。\n[接続を追加](command:dbRover.addConnection)\n使い方は[はじめに](command:dbRover.openWalkthrough)から確認できます。"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "check": "node scripts/check-mutations.mjs && node scripts/check-statements.mjs && node scripts/check-connection-comment.mjs",
+    "verify": "npm run typecheck && npm run check",
+    "package": "npx --yes @vscode/vsce package --allow-missing-repository",
+    "install:local": "npm run package && code --install-extension db-rover-$npm_package_version.vsix --force",
+    "vscode:prepublish": "npm run compile"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.4",
+    "node-sqlite3-wasm": "^0.8.60",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "@types/pg": "^8.11.10",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.2"
+  }
+}
