@@ -135,7 +135,12 @@ export type ExtensionToTableViewMessage =
   | { type: 'error'; message: string }
   | { type: 'applied'; affectedRows: number }
   // VS Code 側のキーバインド（既定は Cmd/Ctrl+S）から保存を促す
-  | { type: 'requestSave' };
+  | { type: 'requestSave' }
+  // VS Code 側のキーバインド（既定は Cmd/Ctrl+R）から再読み込みを促す
+  | { type: 'requestReload' };
+
+/** 結果をテキストに書き出すときの形式。設定 `dbRover.exportFormat` で選ぶ。 */
+export type ExportFormat = 'csv' | 'tsv';
 
 /** 1 文ぶんの実行結果。`;` 区切りで複数文を流したとき、まとめて結果パネルへ渡す。 */
 export interface StatementOutcome {
@@ -150,10 +155,11 @@ export interface StatementOutcome {
 export type QueryPanelToExtensionMessage =
   | { type: 'ready' }
   | { type: 'copyValue'; value: string }
-  | { type: 'exportCsv'; mode: 'copy' | 'save'; index: number };
+  // 書き出す形式（CSV / TSV）は設定 dbRover.exportFormat 側で決まるので webview は指定しない
+  | { type: 'export'; mode: 'copy' | 'save'; index: number };
 
 export type ExtensionToQueryPanelMessage =
-  | { type: 'config'; keymap: GridKeymapOverrides }
+  | { type: 'config'; keymap: GridKeymapOverrides; exportFormat: ExportFormat }
   | { type: 'results'; connectionName: string; outcomes: StatementOutcome[] }
   | { type: 'error'; message: string };
 
@@ -190,3 +196,48 @@ export type ExtensionToConnectionEditorMessage =
   | { type: 'file'; path: string }
   | { type: 'busy'; busy: boolean }
   | { type: 'status'; level: 'info' | 'error'; message: string };
+
+// --- AI 連携（MCP / Language Model Tools）関連 ---
+
+/** ツール定義の唯一の真は src/ai/toolDefs.ts。ここでは型として再輸出するだけにする。 */
+export type { AiToolName } from './ai/toolDefs.js';
+
+/** AI ツールの呼び出し元。監査ログの表示分岐・承認モーダルの文言分岐に使う。 */
+export type AiCaller = 'mcp' | 'lm';
+
+/**
+ * dbrover_list_connections が返す、接続中の接続 1 件分。
+ * パスワード（user）や SQLite の絶対パス（file）は含めない。
+ */
+export interface AiConnectionInfo {
+  id: string;
+  name: string;
+  kind: DbKind;
+  database?: string;
+  host?: string;
+}
+
+/** dbrover_run_sql が返す 1 文ぶんの結果。StatementOutcome をサイズ制限つきで JSON 化したもの。 */
+export interface AiStatementPayload {
+  index: number;
+  sql: string;
+  status: 'ok' | 'error' | 'skipped';
+  columns?: string[];
+  rows?: unknown[][];
+  rowCount?: number;
+  truncated?: boolean;
+  durationMs?: number;
+  command?: string;
+  message?: string;
+}
+
+export interface AiRunSqlPayload {
+  statements: AiStatementPayload[];
+  note?: string;
+}
+
+/** dbRover.ai.showStatus / ステータスバーの tooltip に使う、MCP サーバの状態。 */
+export interface AiServerStatus {
+  running: boolean;
+  port?: number;
+}

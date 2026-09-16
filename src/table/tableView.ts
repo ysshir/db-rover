@@ -75,6 +75,14 @@ export class TableViewManager implements vscode.Disposable {
     this.activePanel?.webview.postMessage({ type: 'requestSave' } satisfies ExtensionToTableViewMessage);
   }
 
+  /**
+   * 表示中のテーブルビューを再読み込みする。ページ位置・ソート・WHERE は保ったまま、
+   * webview 側から browse を投げ直してもらう（未保存の変更があるときは webview 側で断る）。
+   */
+  requestReloadOnActivePanel(): void {
+    this.activePanel?.webview.postMessage({ type: 'requestReload' } satisfies ExtensionToTableViewMessage);
+  }
+
   dispose(): void {
     for (const panel of this.panels.values()) {
       panel.dispose();

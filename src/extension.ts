@@ -20,8 +20,13 @@ import { StatementFocus } from './query/statementFocus.js';
 import { TableViewManager } from './table/tableView.js';
 import type { ConnectionConfig } from './types.js';
 import type { RunScope } from './query/execute.js';
+import { AiIntegration } from './ai/integration.js';
+
+/** 絞り込みの入力をツリーへ反映するまでの待ち時間（ms）。1 文字ごとに問い合わせを投げないための間引き。 */
+const FILTER_APPLY_DELAY_MS = 200;
 
 let statusBarItem: vscode.StatusBarItem;
+let aiIntegration: AiIntegration | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel('DB Rover');
@@ -68,6 +73,12 @@ export function activate(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true },
     }),
   );
+
+  // AI 連携（MCP サーバ + Language Model Tools）。トークン取得とサーバ起動は非同期なので、
+  // コンストラクタ（同期）で subscriptions に積んでから activate() を投げっぱなしにする。
+  aiIntegration = new AiIntegration(context, manager, outputChannel, resultView);
+  context.subscriptions.push(aiIntegration);
+  void aiIntegration.activate().catch((error) => showError(outputChannel, error, 'AI 連携の初期化に失敗しました'));
 
   // Cmd/Ctrl+Enter で実行対象をハイライトし、Enter で実行するための状態。
   const statementFocus = new StatementFocus();
@@ -123,7 +134,8 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  return undefined;
+  // MCP サーバ（node:http）を確実に閉じるため、AiIntegration の破棄を待つ。
+  return aiIntegration?.dispose();
 }
 
 /**
@@ -209,6 +221,41 @@ function showError(outputChannel: vscode.OutputChannel, error: unknown, prefix: 
   void vscode.window.showErrorMessage(`DB Rover: ${prefix}: ${message}`);
 }
 
+/**
+ * テーブル／ビュー名の絞り込みを入力させる。
+ * 入力するそばからツリーへ適用する。キー入力ごとに listTables を投げ直すことになるので、
+ * 適用は少しだけ遅らせる。
+ *
+ * 閉じたときは入力内容のまま確定させ、元には戻さない。絞り込んだ結果のテーブルを
+ * クリックした瞬間にも入力欄は閉じるので、そこで巻き戻すと目的の行ごと消えてしまう。
+ * 取り消したいときは空にするか、接続行の $(filter-filled) を押す。
+ */
+async function filterConnection(treeProvider: DbRoverTreeProvider, config: ConnectionConfig): Promise<void> {
+  const input = vscode.window.createInputBox();
+  input.title = `${config.name}: テーブル／ビュー名で絞り込み`;
+  input.prompt = '空白区切りはすべてを含む条件（AND）、`*` はワイルドカード。空にすると解除します。';
+  input.placeholder = '例: user  /  order_*';
+  input.value = treeProvider.getFilter(config.id) ?? '';
+
+  let timer: NodeJS.Timeout | undefined;
+
+  await new Promise<void>((resolve) => {
+    input.onDidChangeValue((value) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => treeProvider.setFilter(config.id, value), FILTER_APPLY_DELAY_MS);
+    });
+    input.onDidAccept(() => input.hide());
+    input.onDidHide(() => {
+      // 待ち中の適用を捨てて、閉じた時点の入力で確定させる。
+      if (timer) clearTimeout(timer);
+      treeProvider.setFilter(config.id, input.value);
+      input.dispose();
+      resolve();
+    });
+    input.show();
+  });
+}
+
 async function pickConnection(placeHolder: string): Promise<ConnectionConfig | undefined> {
   const connections = getConnections();
   if (connections.length === 0) {
@@ -270,6 +317,7 @@ function registerCommands(
         await removeConnectionConfig(config.id);
         await deletePassword(context.secrets, config.id);
         bindings.clearConnection(config.id);
+        treeProvider.setFilter(config.id, undefined);
         treeProvider.refresh();
       } catch (error) {
         showError(outputChannel, error, '接続の削除に失敗しました');
@@ -292,6 +340,28 @@ function registerCommands(
       if (!config) return;
       await manager.disconnect(config.id);
       treeProvider.refresh();
+    }),
+
+    // ツリーの接続行にある漏斗のアイコン。入力した文字でテーブル／ビュー名を絞り込む。
+    // 入力中はツリーが追従する（打ち終わるまで結果が見えないのでは絞り込みにならない）。
+    vscode.commands.registerCommand('dbRover.filterTree', async (node?: ConnectionNode) => {
+      const config = node?.config ?? (await pickConnection('絞り込む接続を選択してください'));
+      if (!config) return;
+      try {
+        // 未接続だと絞り込んだ結果を出しようがないので、先につないでおく。
+        await manager.ensureConnected(config);
+        treeProvider.refresh();
+      } catch (error) {
+        showError(outputChannel, error, '接続に失敗しました');
+        return;
+      }
+      await filterConnection(treeProvider, config);
+    }),
+
+    vscode.commands.registerCommand('dbRover.clearTreeFilter', async (node?: ConnectionNode) => {
+      const config = node?.config ?? (await pickConnection('絞り込みを解除する接続を選択してください'));
+      if (!config) return;
+      treeProvider.setFilter(config.id, undefined);
     }),
 
     vscode.commands.registerCommand('dbRover.selectActiveConnection', async () => {
@@ -435,6 +505,11 @@ function registerCommands(
     // Cmd/Ctrl+S。実際の確認ダイアログと SQL 生成は webview 側が行う。
     vscode.commands.registerCommand('dbRover.saveTableEdits', () => {
       tableViewManager.requestSaveOnActivePanel();
+    }),
+
+    // Cmd/Ctrl+R。現在のページ位置・ソート・WHERE を保ったまま読み直す。
+    vscode.commands.registerCommand('dbRover.reloadTableView', () => {
+      tableViewManager.requestReloadOnActivePanel();
     }),
 
     vscode.commands.registerCommand('dbRover.copyName', async (node?: DbRoverNode) => {

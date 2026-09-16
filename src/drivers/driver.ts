@@ -11,8 +11,19 @@ import type {
   TableMeta,
 } from '../types.js';
 
+/**
+ * 接続が非同期に切れたことを知らせるリスナ登録関数（`vscode.Event` と同じ形）。
+ * driver.ts を vscode 非依存に保つため、必要な形だけをここで宣言する。
+ */
+export type ConnectionLostEvent = (listener: (error: unknown) => void) => { dispose(): void };
+
 export interface DbDriver {
   readonly kind: DbKind;
+  /**
+   * クエリの外側（待機中のソケットなど）で接続が切れたときに発火する。
+   * 発火した時点でドライバは使用不能で、次の操作の前に張り直す必要がある。
+   */
+  readonly onConnectionLost: ConnectionLostEvent;
   connect(): Promise<void>;
   dispose(): Promise<void>;
   listSchemas(): Promise<string[]>; // sqlite は ['main'] 固定

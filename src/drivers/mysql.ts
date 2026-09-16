@@ -46,6 +46,9 @@ interface StatisticsRow {
 export class MysqlDriver implements DbDriver {
   readonly kind = 'mysql' as const;
   private connection: Connection | undefined;
+  // 張り直し（dispose → connect）をまたいで生き残る必要があるので dispose() では捨てない。
+  private readonly connectionLostEmitter = new vscode.EventEmitter<unknown>();
+  readonly onConnectionLost = this.connectionLostEmitter.event;
 
   constructor(
     private readonly config: ConnectionConfig,
@@ -53,7 +56,7 @@ export class MysqlDriver implements DbDriver {
   ) {}
 
   async connect(): Promise<void> {
-    this.connection = await createConnection({
+    const connection = await createConnection({
       host: this.config.host,
       port: this.config.port,
       database: this.config.database,
@@ -61,12 +64,26 @@ export class MysqlDriver implements DbDriver {
       password: this.password,
       ssl: this.config.ssl ? {} : undefined,
     });
+    // クエリを待っていないときにソケットが死ぬと 'error' が飛ぶ。listener が無いと
+    // Node の既定動作で拡張機能ホストごと落ちるため、必ず受け取って上位に知らせる。
+    connection.on('error', (error: unknown) => {
+      if (this.connection !== connection) {
+        return; // 既に張り直した後の、古い接続からの通知
+      }
+      this.connection = undefined;
+      this.connectionLostEmitter.fire(error);
+    });
+    this.connection = connection;
   }
 
   async dispose(): Promise<void> {
     if (this.connection) {
-      await this.connection.end().catch(() => undefined);
+      const connection = this.connection;
       this.connection = undefined;
+      // 既に死んでいる接続の end() は同期的に投げることがある
+      await Promise.resolve()
+        .then(() => connection.end())
+        .catch(() => undefined);
     }
   }
 

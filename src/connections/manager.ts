@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import type { ConnectionConfig } from '../types.js';
 import type { DbDriver } from '../drivers/driver.js';
 import { createDriver } from '../drivers/index.js';
+import { ResilientDriver } from '../drivers/resilient.js';
 import { getPassword, setPassword } from './store.js';
 
 /** 生きているドライバの保持・接続/切断・アクティブ接続の管理を行う。 */
@@ -68,7 +69,14 @@ export class ConnectionManager implements vscode.Disposable {
       }
     }
 
-    const driver = createDriver(config, password);
+    // 生のドライバではなく ResilientDriver を配る。スリープ復帰や VPN の張り直しで
+    // ソケットが死んだとき（read EADDRNOTAVAIL など）、呼び出し側は何もしなくてよい。
+    const driver = new ResilientDriver(createDriver(config, password), {
+      log: (message) => this.outputChannel.appendLine(`[${config.name}] ${message}`),
+      onGaveUp: () => {
+        void this.handleUnrecoverable(config);
+      },
+    });
     try {
       await driver.connect();
     } catch (error) {
@@ -97,6 +105,17 @@ export class ConnectionManager implements vscode.Disposable {
 
   async disconnectAll(): Promise<void> {
     await Promise.all(Array.from(this.drivers.keys()).map((id) => this.disconnect(id)));
+  }
+
+  /** 再接続を諦めた接続を畳む。ツリーを未接続表示に戻し、一度だけ知らせる。 */
+  private async handleUnrecoverable(config: ConnectionConfig): Promise<void> {
+    if (!this.drivers.has(config.id)) {
+      return; // 既に畳んである
+    }
+    await this.disconnect(config.id);
+    void vscode.window.showWarningMessage(
+      `DB Rover: ${config.name} との接続が切れ、再接続できませんでした。ツリーから開き直すと接続し直します。`,
+    );
   }
 
   private logError(error: unknown, message: string): void {

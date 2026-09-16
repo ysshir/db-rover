@@ -67,6 +67,9 @@ interface IndexInfoRow {
 export class SqliteDriver implements DbDriver {
   readonly kind = 'sqlite' as const;
   private db: Database | undefined;
+  // ローカルファイルなので非同期に切れることはない。インタフェースを満たすためだけに持つ。
+  private readonly connectionLostEmitter = new vscode.EventEmitter<unknown>();
+  readonly onConnectionLost = this.connectionLostEmitter.event;
 
   constructor(private readonly config: ConnectionConfig) {}
 

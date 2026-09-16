@@ -49,11 +49,12 @@ export async function runStatements(
   statements: { sql: string; start: number }[],
   limit: number,
   stopOnError: boolean,
+  progressTitle = 'DB Rover: SQL を実行しています…',
 ): Promise<StatementOutcome[]> {
   return vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
-      title: 'DB Rover: SQL を実行しています…',
+      title: progressTitle,
       cancellable: true,
     },
     async (progress, token) => {

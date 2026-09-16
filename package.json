@@ -2,17 +2,19 @@
   "name": "db-rover",
   "displayName": "DB Rover",
   "description": "サイドバーからデータベースを探索し、SQL を実行して結果を確認できる VS Code 拡張機能",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "leptosystem",
   "private": true,
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.101.0"
   },
   "categories": [
     "Other"
   ],
   "main": "./dist/extension.js",
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
       {
@@ -35,12 +37,26 @@
       {
         "command": "dbRover.connect",
         "title": "接続",
-        "category": "DB Rover"
+        "category": "DB Rover",
+        "icon": "$(plug)"
       },
       {
         "command": "dbRover.disconnect",
         "title": "切断",
-        "category": "DB Rover"
+        "category": "DB Rover",
+        "icon": "$(debug-disconnect)"
+      },
+      {
+        "command": "dbRover.filterTree",
+        "title": "テーブル名で絞り込み",
+        "category": "DB Rover",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "dbRover.clearTreeFilter",
+        "title": "絞り込みを解除",
+        "category": "DB Rover",
+        "icon": "$(filter-filled)"
       },
       {
         "command": "dbRover.refresh",
@@ -86,6 +102,12 @@
         "category": "DB Rover"
       },
       {
+        "command": "dbRover.reloadTableView",
+        "title": "テーブルビューを再読み込み",
+        "category": "DB Rover",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "dbRover.runStatement",
         "title": "この SQL を実行",
         "category": "DB Rover",
@@ -127,6 +149,41 @@
       {
         "command": "dbRover.openWalkthrough",
         "title": "はじめに（使い方）",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.ai.startServer",
+        "title": "AI 連携: MCP サーバを開始",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.ai.stopServer",
+        "title": "AI 連携: MCP サーバを停止",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.ai.copyMcpConfig",
+        "title": "AI 連携: MCP の設定をコピー",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.ai.writeMcpJson",
+        "title": "AI 連携: .mcp.json に登録",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.ai.showStatus",
+        "title": "AI 連携: 状態を表示",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.ai.rotateToken",
+        "title": "AI 連携: トークンを再発行",
+        "category": "DB Rover"
+      },
+      {
+        "command": "dbRover.ai.resetApprovals",
+        "title": "AI 連携: 書き込みの許可をリセット",
         "category": "DB Rover"
       }
     ],
@@ -178,18 +235,28 @@
       "view/item/context": [
         {
           "command": "dbRover.newQuery",
-          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected)",
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\./",
           "group": "inline@0"
         },
         {
           "command": "dbRover.connect",
-          "when": "view == dbRover.connections && viewItem == connection.disconnected",
-          "group": "inline"
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\.disconnected/",
+          "group": "inline@1"
         },
         {
           "command": "dbRover.disconnect",
-          "when": "view == dbRover.connections && viewItem == connection.connected",
-          "group": "inline"
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\.connected/",
+          "group": "inline@1"
+        },
+        {
+          "command": "dbRover.filterTree",
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\.(connected|disconnected)$/",
+          "group": "inline@2"
+        },
+        {
+          "command": "dbRover.clearTreeFilter",
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\..*\\.filtered$/",
+          "group": "inline@2"
         },
         {
           "command": "dbRover.previewTableData",
@@ -198,17 +265,27 @@
         },
         {
           "command": "dbRover.copyName",
-          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected || viewItem == schema || viewItem == table || viewItem == view || viewItem == column || viewItem == index)",
+          "when": "view == dbRover.connections && (viewItem =~ /^connection\\./ || viewItem == schema || viewItem == table || viewItem == view || viewItem == column || viewItem == index)",
           "group": "1_copy"
         },
         {
+          "command": "dbRover.filterTree",
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\./",
+          "group": "1_filter@1"
+        },
+        {
+          "command": "dbRover.clearTreeFilter",
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\..*\\.filtered$/",
+          "group": "1_filter@2"
+        },
+        {
           "command": "dbRover.editConnection",
-          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected)",
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\./",
           "group": "2_modify@1"
         },
         {
           "command": "dbRover.removeConnection",
-          "when": "view == dbRover.connections && (viewItem == connection.connected || viewItem == connection.disconnected)",
+          "when": "view == dbRover.connections && viewItem =~ /^connection\\./",
           "group": "2_modify@2"
         }
       ],
@@ -250,6 +327,29 @@
         },
         {
           "command": "dbRover.openWalkthrough"
+        },
+        {
+          "command": "dbRover.ai.startServer",
+          "when": "!dbRover.ai.serverRunning"
+        },
+        {
+          "command": "dbRover.ai.stopServer",
+          "when": "dbRover.ai.serverRunning"
+        },
+        {
+          "command": "dbRover.ai.copyMcpConfig"
+        },
+        {
+          "command": "dbRover.ai.writeMcpJson"
+        },
+        {
+          "command": "dbRover.ai.showStatus"
+        },
+        {
+          "command": "dbRover.ai.rotateToken"
+        },
+        {
+          "command": "dbRover.ai.resetApprovals"
         }
       ],
       "editor/title": [
@@ -320,6 +420,18 @@
         "key": "ctrl+s",
         "mac": "cmd+s",
         "when": "activeWebviewPanelId == dbRover.tableView"
+      },
+      {
+        "command": "dbRover.reloadTableView",
+        "key": "ctrl+r",
+        "mac": "cmd+r",
+        "when": "activeWebviewPanelId == dbRover.tableView"
+      },
+      {
+        "command": "dbRover.refresh",
+        "key": "ctrl+r",
+        "mac": "cmd+r",
+        "when": "focusedView == dbRover.connections"
       }
     ],
     "configuration": {
@@ -399,6 +511,19 @@
           "type": "boolean",
           "default": true,
           "description": "テーブルビューで総行数（COUNT）を取得するか。大きなテーブルで遅い場合は無効にしてください。"
+        },
+        "dbRover.exportFormat": {
+          "type": "string",
+          "enum": [
+            "csv",
+            "tsv"
+          ],
+          "enumDescriptions": [
+            "カンマ区切り（.csv）",
+            "タブ区切り（.tsv）。表計算ソフトへ貼り付けるときはこちらが崩れにくい"
+          ],
+          "default": "csv",
+          "description": "クエリ結果の「コピー」「保存」で書き出す形式。"
         },
         "dbRover.keybindings": {
           "type": "object",
@@ -557,9 +682,189 @@
           "type": "boolean",
           "default": true,
           "description": "複数の SQL を続けて実行しているときにエラーが起きたら、以降の SQL を実行せず中断するか"
+        },
+        "dbRover.ai.mcpServer.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "AI 連携: ローカルの MCP サーバ（Claude Code など外部 AI 向け）を起動するか。ループバックのみで待ち受けます。"
+        },
+        "dbRover.ai.languageModelTools.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "AI 連携: Copilot Chat などの Language Model Tools として 4 つのツールを公開するか。"
+        },
+        "dbRover.ai.port": {
+          "type": "number",
+          "default": 47600,
+          "description": "AI 連携: MCP サーバの待ち受けポート。使用中なら自動で 1 つずつ空きを探し、全滅時は空きポートへ切り替えます。0 を指定すると常に空きポートを使います。"
+        },
+        "dbRover.ai.writes": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "never",
+            "session"
+          ],
+          "enumDescriptions": [
+            "書き込みを含む文はそのつど確認する",
+            "書き込みを含む文はすべて拒否する",
+            "接続ごとに一度許可すれば、そのウィンドウを閉じるまで再確認しない（取り消せない文は除く）"
+          ],
+          "default": "ask",
+          "description": "AI 連携: 読み取り以外の SQL 文を実行してよいかどうかの既定動作。取り消せない文（DROP / TRUNCATE / WHERE 無しの DELETE・UPDATE 等）は常に確認します。"
+        },
+        "dbRover.ai.maxRows": {
+          "type": "number",
+          "default": 200,
+          "description": "AI 連携: dbrover_run_sql が返す既定の最大行数（上限 1000）。呼び出し側の maxRows 指定で個別に上書きできます。"
+        },
+        "dbRover.ai.maxStatements": {
+          "type": "number",
+          "default": 10,
+          "description": "AI 連携: dbrover_run_sql で一度に実行できる SQL 文の最大数。"
+        },
+        "dbRover.ai.timeoutMs": {
+          "type": "number",
+          "default": 30000,
+          "description": "AI 連携: SQL 実行のタイムアウト（ミリ秒）。超過すると該当の接続を切断します。"
+        },
+        "dbRover.ai.showResults": {
+          "type": "boolean",
+          "default": true,
+          "description": "AI 連携: dbrover_run_sql の実行結果を既存のクエリ結果パネルにも表示するか。"
         }
       }
     },
+    "languageModelTools": [
+      {
+        "name": "dbrover_list_connections",
+        "displayName": "DB Rover: 接続一覧",
+        "userDescription": "DB Rover で現在接続中のデータベース接続を一覧します。",
+        "modelDescription": "DB Rover で現在「接続中」の接続だけを一覧します。未接続の接続は含まれません。ここで得た connectionId を他のツールに渡してください。",
+        "toolReferenceName": "dbRoverConnections",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(database)",
+        "tags": [
+          "database",
+          "sql",
+          "db-rover"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "dbrover_list_tables",
+        "displayName": "DB Rover: テーブル一覧",
+        "userDescription": "DB Rover の接続内のテーブル・ビュー一覧をスキーマごとに取得します。",
+        "modelDescription": "指定した接続内のテーブル・ビュー一覧をスキーマごとに返します。connectionId は dbrover_list_connections で取得してください。",
+        "toolReferenceName": "dbRoverTables",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(database)",
+        "tags": [
+          "database",
+          "sql",
+          "db-rover"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionId": {
+              "type": "string",
+              "description": "対象の接続 ID。dbrover_list_connections で取得したものを渡してください。"
+            },
+            "schema": {
+              "type": "string",
+              "description": "対象スキーマ名（省略時は既定のスキーマ／データベース全体を対象にする）。"
+            }
+          },
+          "required": [
+            "connectionId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "dbrover_describe_table",
+        "displayName": "DB Rover: テーブル定義を取得",
+        "userDescription": "DB Rover でテーブルの列定義とインデックスを取得します（実データは含みません）。",
+        "modelDescription": "指定したテーブルの列定義（columns）とインデックス（indexes）を返します。サンプル行など実データは含みません。connectionId は dbrover_list_connections で取得してください。",
+        "toolReferenceName": "dbRoverDescribe",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(database)",
+        "tags": [
+          "database",
+          "sql",
+          "db-rover"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionId": {
+              "type": "string",
+              "description": "対象の接続 ID。dbrover_list_connections で取得したものを渡してください。"
+            },
+            "table": {
+              "type": "string",
+              "description": "テーブル名（スキーマ修飾なし）。"
+            },
+            "schema": {
+              "type": "string",
+              "description": "対象スキーマ名（省略時は既定のスキーマ／データベース全体を対象にする）。"
+            }
+          },
+          "required": [
+            "connectionId",
+            "table"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "dbrover_run_sql",
+        "displayName": "DB Rover: SQL を実行",
+        "userDescription": "DB Rover で接続中のデータベースに SQL を実行します。読み取り以外は確認が必要です。",
+        "modelDescription": "DB Rover で接続中のデータベースに SQL を実行します。読み取り以外の文はユーザーの承認が必要です。取り消せない文（DROP / TRUNCATE / WHERE 無しの DELETE・UPDATE 等）は毎回確認されます。接続 ID は dbrover_list_connections で取得してください。",
+        "toolReferenceName": "dbRoverSql",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(database)",
+        "tags": [
+          "database",
+          "sql",
+          "db-rover"
+        ],
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "connectionId": {
+              "type": "string",
+              "description": "対象の接続 ID。dbrover_list_connections で取得したものを渡してください。"
+            },
+            "sql": {
+              "type": "string",
+              "description": "実行する SQL。`;` 区切りで複数文を渡せます。"
+            },
+            "maxRows": {
+              "type": "number",
+              "description": "返す最大行数（既定 200、上限 1000）。"
+            }
+          },
+          "required": [
+            "connectionId",
+            "sql"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "dbRover.mcp",
+        "label": "DB Rover"
+      }
+    ],
     "colors": [
       {
         "id": "dbRover.statementFocusBackground",
@@ -656,7 +961,7 @@
     "compile": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "check": "node scripts/check-mutations.mjs && node scripts/check-statements.mjs && node scripts/check-connection-comment.mjs",
+    "check": "node scripts/check-mutations.mjs && node scripts/check-statements.mjs && node scripts/check-connection-comment.mjs && node scripts/check-recovery.mjs && node scripts/check-resilient.mjs && node scripts/check-export.mjs && node scripts/check-statement-kind.mjs && node scripts/check-ai-limits.mjs && node scripts/check-ai-auth.mjs && node scripts/check-approval.mjs && node scripts/check-mcp-rpc.mjs && node scripts/check-tree-filter.mjs",
     "verify": "npm run typecheck && npm run check",
     "package": "npx --yes @vscode/vsce package --allow-missing-repository",
     "install:local": "npm run package && code --install-extension db-rover-$npm_package_version.vsix --force",
@@ -670,7 +975,7 @@
   "devDependencies": {
     "@types/node": "^22.20.2",
     "@types/pg": "^8.11.10",
-    "@types/vscode": "^1.85.0",
+    "@types/vscode": "^1.101.0",
     "esbuild": "^0.28.2",
     "typescript": "^5.7.2"
   }

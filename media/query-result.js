@@ -1,4 +1,4 @@
-// DB Rover クエリ結果パネル（読み取り専用グリッド + CSV 出力）。
+// DB Rover クエリ結果パネル（読み取り専用グリッド + 書き出し）。
 // `;` で分割した複数の SQL 文をまとめて受け取り、結果セレクタで切り替えて表示する。
 (function () {
   'use strict';
@@ -11,8 +11,8 @@
     '<select class="dbrover-select dbrover-statement-select" style="display:none"></select>' +
     '<span class="dbrover-info dbrover-summary"></span>' +
     '<span class="dbrover-spacer"></span>' +
-    '<button class="dbrover-btn secondary dbrover-copy-csv">CSV をコピー</button>' +
-    '<button class="dbrover-btn secondary dbrover-save-csv">CSV として保存</button>' +
+    '<button class="dbrover-btn secondary dbrover-copy">コピー</button>' +
+    '<button class="dbrover-btn secondary dbrover-save">保存</button>' +
     '</div>' +
     '<div class="dbrover-overall-summary" style="display:none"></div>' +
     '<div class="dbrover-warning-bar" style="display:none"></div>' +
@@ -34,10 +34,11 @@
   var errorMessageEl = app.querySelector('.dbrover-error-message');
   var skippedMessageEl = app.querySelector('.dbrover-skipped-message');
   var gridHost = app.querySelector('.dbrover-grid-host');
-  var copyCsvBtn = app.querySelector('.dbrover-copy-csv');
-  var saveCsvBtn = app.querySelector('.dbrover-save-csv');
+  var copyBtn = app.querySelector('.dbrover-copy');
+  var saveBtn = app.querySelector('.dbrover-save');
 
   var keymap = {}; // 拡張側から config で届くキー割り当ての上書き
+  var exportFormat = 'csv'; // 書き出す形式（設定 dbRover.exportFormat）。ボタンの説明に出す
   var grid = null;
   var outcomes = []; // 直近に受け取った StatementOutcome[]
   var selectedIndex = 0;
@@ -56,11 +57,20 @@
     return grid;
   }
 
-  copyCsvBtn.addEventListener('click', function () {
-    vscode.postMessage({ type: 'exportCsv', mode: 'copy', index: selectedIndex });
+  /** ボタン名は形式を持たせずに短くし、どの形式で出るかは tooltip で伝える。 */
+  function updateExportTooltips() {
+    var label = exportFormat === 'tsv' ? 'TSV（タブ区切り）' : 'CSV（カンマ区切り）';
+    copyBtn.title = '表示中の結果を ' + label + ' としてクリップボードにコピーします。形式は設定 dbRover.exportFormat で変えられます。';
+    saveBtn.title = '表示中の結果を ' + label + ' としてファイルに保存します。形式は設定 dbRover.exportFormat で変えられます。';
+  }
+
+  updateExportTooltips();
+
+  copyBtn.addEventListener('click', function () {
+    vscode.postMessage({ type: 'export', mode: 'copy', index: selectedIndex });
   });
-  saveCsvBtn.addEventListener('click', function () {
-    vscode.postMessage({ type: 'exportCsv', mode: 'save', index: selectedIndex });
+  saveBtn.addEventListener('click', function () {
+    vscode.postMessage({ type: 'export', mode: 'save', index: selectedIndex });
   });
   statementSelect.addEventListener('change', function () {
     selectedIndex = Number(statementSelect.value);
@@ -159,23 +169,23 @@
       errorMessageEl.style.display = 'block';
       errorMessageEl.textContent = outcome.message || 'エラーが発生しました。';
       summaryEl.textContent = '';
-      copyCsvBtn.disabled = true;
-      saveCsvBtn.disabled = true;
+      copyBtn.disabled = true;
+      saveBtn.disabled = true;
       return;
     }
 
     if (outcome.status === 'skipped') {
       skippedMessageEl.style.display = 'block';
       summaryEl.textContent = '';
-      copyCsvBtn.disabled = true;
-      saveCsvBtn.disabled = true;
+      copyBtn.disabled = true;
+      saveBtn.disabled = true;
       return;
     }
 
     var result = outcome.result;
     if (!result) {
-      copyCsvBtn.disabled = true;
-      saveCsvBtn.disabled = true;
+      copyBtn.disabled = true;
+      saveBtn.disabled = true;
       return;
     }
 
@@ -202,9 +212,9 @@
       grid.setRows(result.rows);
     }
 
-    var enableCsv = hasColumns && result.rows.length > 0;
-    copyCsvBtn.disabled = !enableCsv;
-    saveCsvBtn.disabled = !enableCsv;
+    var exportable = hasColumns && result.rows.length > 0;
+    copyBtn.disabled = !exportable;
+    saveBtn.disabled = !exportable;
   }
 
   function renderResults(connectionName, newOutcomes) {
@@ -220,6 +230,8 @@
     switch (message.type) {
       case 'config':
         keymap = message.keymap || {};
+        exportFormat = message.exportFormat === 'tsv' ? 'tsv' : 'csv';
+        updateExportTooltips();
         break;
       case 'results':
         renderResults(message.connectionName, message.outcomes);

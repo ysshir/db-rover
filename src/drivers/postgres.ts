@@ -21,6 +21,9 @@ const EXCLUDED_SCHEMAS = ['pg_catalog', 'information_schema'];
 export class PostgresDriver implements DbDriver {
   readonly kind = 'postgres' as const;
   private client: Client | undefined;
+  // 張り直し（dispose → connect）をまたいで生き残る必要があるので dispose() では捨てない。
+  private readonly connectionLostEmitter = new vscode.EventEmitter<unknown>();
+  readonly onConnectionLost = this.connectionLostEmitter.event;
 
   constructor(
     private readonly config: ConnectionConfig,
@@ -35,6 +38,16 @@ export class PostgresDriver implements DbDriver {
       user: this.config.user,
       password: this.password,
       ssl: this.config.ssl ? { rejectUnauthorized: false } : undefined,
+    });
+    // クエリを待っていないときにソケットが死ぬと 'error' が飛ぶ。listener が無いと
+    // Node の既定動作で拡張機能ホストごと落ちるため、必ず受け取って上位に知らせる。
+    client.on('error', (error: unknown) => {
+      if (this.client !== client) {
+        return; // 既に張り直した後の、古いクライアントからの通知
+      }
+      this.client = undefined;
+      void client.end().catch(() => undefined);
+      this.connectionLostEmitter.fire(error);
     });
     await client.connect();
     this.client = client;

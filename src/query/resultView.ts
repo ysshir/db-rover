@@ -1,12 +1,13 @@
 import * as crypto from 'node:crypto';
 import * as vscode from 'vscode';
 import type {
+  ExportFormat,
   ExtensionToQueryPanelMessage,
   GridKeymapOverrides,
   QueryPanelToExtensionMessage,
   StatementOutcome,
 } from '../types.js';
-import { toCsv } from '../util/csv.js';
+import { EXPORT_LABELS, normalizeExportFormat, toDelimitedText } from '../util/delimited.js';
 
 /**
  * クエリ結果を表示するビュー。ターミナルや出力と同じ下部パネルに常駐させる。
@@ -54,6 +55,16 @@ export class QueryResultView implements vscode.WebviewViewProvider, vscode.Dispo
       null,
       this.disposables,
     );
+    vscode.workspace.onDidChangeConfiguration(
+      (event) => {
+        // ボタンの tooltip に形式を出しているので、設定が変わったら送り直す。
+        if (event.affectsConfiguration('dbRover.exportFormat') || event.affectsConfiguration('dbRover.keybindings')) {
+          this.postConfig();
+        }
+      },
+      null,
+      this.disposables,
+    );
     if (this.lastConnectionName !== undefined) {
       view.description = this.lastConnectionName;
     }
@@ -90,10 +101,7 @@ export class QueryResultView implements vscode.WebviewViewProvider, vscode.Dispo
   private async handleMessage(message: QueryPanelToExtensionMessage): Promise<void> {
     switch (message.type) {
       case 'ready':
-        this.postMessage({
-          type: 'config',
-          keymap: vscode.workspace.getConfiguration('dbRover').get<GridKeymapOverrides>('keybindings', {}),
-        });
+        this.postConfig();
         if (this.lastOutcomes && this.lastConnectionName !== undefined) {
           // webview がリロードされた場合に備えて再送する。
           this.postMessage({ type: 'results', connectionName: this.lastConnectionName, outcomes: this.lastOutcomes });
@@ -102,8 +110,8 @@ export class QueryResultView implements vscode.WebviewViewProvider, vscode.Dispo
       case 'copyValue':
         await vscode.env.clipboard.writeText(message.value);
         break;
-      case 'exportCsv':
-        await this.exportCsv(message.mode, message.index);
+      case 'export':
+        await this.exportResult(message.mode, message.index);
         break;
       default: {
         const exhaustiveCheck: never = message;
@@ -112,27 +120,43 @@ export class QueryResultView implements vscode.WebviewViewProvider, vscode.Dispo
     }
   }
 
-  private async exportCsv(mode: 'copy' | 'save', index: number): Promise<void> {
+  private postConfig(): void {
+    this.postMessage({
+      type: 'config',
+      keymap: vscode.workspace.getConfiguration('dbRover').get<GridKeymapOverrides>('keybindings', {}),
+      exportFormat: this.exportFormat(),
+    });
+  }
+
+  private exportFormat(): ExportFormat {
+    return normalizeExportFormat(vscode.workspace.getConfiguration('dbRover').get('exportFormat'));
+  }
+
+  /** 結果をクリップボードへ、またはファイルへ書き出す。形式は設定に従う。 */
+  private async exportResult(mode: 'copy' | 'save', index: number): Promise<void> {
     const result = this.lastOutcomes?.[index]?.result;
     if (!result) {
       return;
     }
-    const csv = toCsv(result);
+    // ボタンを押した時点の設定を読む（webview に渡した表示用の形式とずれても実害が無いように）。
+    const format = this.exportFormat();
+    const label = EXPORT_LABELS[format];
+    const text = toDelimitedText(result, format);
     if (mode === 'copy') {
-      await vscode.env.clipboard.writeText(csv);
-      void vscode.window.showInformationMessage('DB Rover: CSV をクリップボードにコピーしました。');
+      await vscode.env.clipboard.writeText(text);
+      void vscode.window.showInformationMessage(`DB Rover: ${label} としてクリップボードにコピーしました。`);
       return;
     }
-    const uri = await vscode.window.showSaveDialog({ filters: { CSV: ['csv'] } });
+    const uri = await vscode.window.showSaveDialog({ filters: { [label]: [format] } });
     if (!uri) {
       return;
     }
     try {
-      await vscode.workspace.fs.writeFile(uri, Buffer.from(csv, 'utf8'));
-      void vscode.window.showInformationMessage(`DB Rover: CSV を保存しました: ${uri.fsPath}`);
+      await vscode.workspace.fs.writeFile(uri, Buffer.from(text, 'utf8'));
+      void vscode.window.showInformationMessage(`DB Rover: ${label} を保存しました: ${uri.fsPath}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      void vscode.window.showErrorMessage(`DB Rover: CSV の保存に失敗しました: ${message}`);
+      void vscode.window.showErrorMessage(`DB Rover: ${label} の保存に失敗しました: ${message}`);
     }
   }
 

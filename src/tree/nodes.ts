@@ -10,13 +10,24 @@ export class ConnectionNode extends vscode.TreeItem {
     public readonly config: ConnectionConfig,
     connected: boolean,
     extensionUri: vscode.Uri,
+    public readonly filter?: string,
   ) {
     super(config.name, connected ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
-    this.contextValue = connected ? 'connection.connected' : 'connection.disconnected';
+    // 接続状態を id に混ぜて、切断したら「別の要素」として扱わせる。
+    // 同じ id のままだと VS Code は開いた状態を覚えていて、切断直後の再描画で
+    // 子の取得（= 遅延接続）が走り、切ったそばから接続し直してしまう。
+    this.id = `connection:${config.id}:${connected ? 'on' : 'off'}`;
+    // 絞り込み中は contextValue の末尾に .filtered を足し、解除アイコンだけを出し分ける。
+    // menus 側は viewItem =~ /^connection\./ で受けているので、接尾辞を足しても他の項目は消えない。
+    const base = connected ? 'connection.connected' : 'connection.disconnected';
+    this.contextValue = filter ? `${base}.filtered` : base;
     // DB の種類ごとに専用アイコンを出す。未接続はグレー版に差し替える。
+    // 接続状態はこのアイコンと、右に出る接続/切断アイコンで分かるので、説明には書かない。
     this.iconPath = ConnectionNode.iconFor(config.kind, connected, extensionUri);
-    this.description = `${config.kind}${connected ? '' : ' (未接続)'}`;
-    this.tooltip = `${config.name} (${config.kind})`;
+    this.description = filter ? `${config.kind} — 絞り込み: ${filter}` : config.kind;
+    this.tooltip = `${config.name} (${config.kind}) — ${connected ? '接続中' : '未接続'}${
+      filter ? `\nテーブル／ビューを「${filter}」で絞り込み中` : ''
+    }`;
   }
 
   private static iconFor(kind: DbKind, connected: boolean, extensionUri: vscode.Uri): vscode.Uri {
@@ -31,10 +42,18 @@ export class SchemaNode extends vscode.TreeItem {
   constructor(
     public readonly connectionId: string,
     public readonly schema: string,
+    expandKey = 0,
   ) {
-    super(schema, vscode.TreeItemCollapsibleState.Collapsed);
+    // 絞り込みを始めたら開いた状態で出す。クリックして辿らないと結果が見えないのでは絞り込む意味がない。
+    super(schema, expandKey > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
+    // expandKey を id に混ぜて「別の要素」として扱わせる。同じ id のままだと VS Code は
+    // ユーザーが閉じた状態を覚えていて、上の Expanded を無視する。
+    // 逆に絞り込みの文字列そのものは混ぜない。1 文字打つたびに別要素になって畳み直されるし、
+    // 解除したときにも畳まれてしまう（一度広げたツリーが勝手に閉じると探し直しになる）。
+    this.id = `schema:${connectionId}:${schema}:${expandKey}`;
     this.contextValue = 'schema';
-    this.iconPath = new vscode.ThemeIcon('symbol-namespace');
+    // symbol-namespace（{}）はコードの名前空間に見えるので、DB らしい database を使う。
+    this.iconPath = new vscode.ThemeIcon('database');
   }
 }
 
@@ -46,8 +65,16 @@ export class GroupNode extends vscode.TreeItem {
     public readonly schema: string,
     public readonly groupKind: GroupKind,
     public readonly table?: string,
+    expandKey = 0,
   ) {
-    super(GroupNode.labelFor(groupKind), vscode.TreeItemCollapsibleState.Collapsed);
+    // 絞り込みを始めたら開いた状態で出す。閉じたままだと、絞り込んだ結果が見えない。
+    const expand = expandKey > 0 && (groupKind === 'tables' || groupKind === 'views');
+    super(
+      GroupNode.labelFor(groupKind),
+      expand ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed,
+    );
+    // SchemaNode と同じ理由で expandKey を id に混ぜ、閉じた状態の記憶を捨てさせる。
+    this.id = `group:${connectionId}:${schema}:${groupKind}:${table ?? ''}:${expand ? expandKey : 0}`;
     this.contextValue = 'group';
     this.iconPath = new vscode.ThemeIcon(GroupNode.iconFor(groupKind));
   }

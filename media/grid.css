@@ -591,6 +591,34 @@ select.dbrover-statement-select.status-skipped {
   border-bottom: 1px solid var(--vscode-panel-border);
 }
 
+/* ページ送りは WHERE バーの左端に置く。ボタンはアイコンだけにして、
+   何のボタンかは title と aria-label で伝える。 */
+.dbrover-pager {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.dbrover-pager .dbrover-range {
+  min-width: 9em;
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+button.dbrover-btn.dbrover-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
+  line-height: 1;
+}
+
+.dbrover-pager .dbrover-pagesize {
+  margin-left: 4px;
+}
+
 .dbrover-where-input-wrap {
   position: relative;
   flex: 1;
@@ -639,6 +667,13 @@ select.dbrover-statement-select.status-skipped {
   font-family: var(--vscode-editor-font-family, monospace);
 }
 
+.dbrover-suggest-name.is-keyword {
+  /* 列名と語句を見分けられるように色を変える */
+  color: var(--vscode-symbolIcon-keywordForeground, var(--vscode-textPreformat-foreground));
+}
+.dbrover-suggest-item.active .dbrover-suggest-name.is-keyword {
+  color: inherit;
+}
 .dbrover-suggest-meta {
   color: var(--vscode-descriptionForeground);
   font-size: 0.9em;
