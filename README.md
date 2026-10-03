@@ -274,4 +274,12 @@ DB Rover が「接続中」の接続に対して SQL を実行できる口を、
 
 ## SQLite の実装について
 
-ネイティブビルド依存を避けるため `node-sqlite3-wasm` を使用しています。
+ネイティブビルド依存を避けるため、次の順で実装を選びます（`src/drivers/sqliteBackend.ts`）。
+
+1. **Node 組み込みの `node:sqlite`**（拡張ホストの Node.js が 22.13 以上のとき）。WAL モードの DB もそのまま開けます。
+   アプリが開発中に使っている DB は WAL モードのことが多いため、こちらを優先します。
+2. **`node-sqlite3-wasm`**（`node:sqlite` が無い環境のフォールバック）。共有メモリ（`-shm`）を扱えないため
+   **WAL モードの DB は開けません**。その場合は WAL である旨のエラーを表示します。対象の DB で
+   `PRAGMA journal_mode = DELETE;` を実行するか、VS Code を更新してください。
+
+`node:sqlite` で開いたときは `busy_timeout = 5000` を設定するので、アプリが書き込み中でもすぐには失敗しません。

@@ -1,8 +1,7 @@
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
-import { Database } from 'node-sqlite3-wasm';
-import type { BindValues } from 'node-sqlite3-wasm';
+import { openSqliteBackend, type SqliteBackend } from './sqliteBackend.js';
 import type {
   BrowseRequest,
   BrowseResult,
@@ -66,7 +65,7 @@ interface IndexInfoRow {
 
 export class SqliteDriver implements DbDriver {
   readonly kind = 'sqlite' as const;
-  private db: Database | undefined;
+  private db: SqliteBackend | undefined;
   // ローカルファイルなので非同期に切れることはない。インタフェースを満たすためだけに持つ。
   private readonly connectionLostEmitter = new vscode.EventEmitter<unknown>();
   readonly onConnectionLost = this.connectionLostEmitter.event;
@@ -75,7 +74,7 @@ export class SqliteDriver implements DbDriver {
 
   async connect(): Promise<void> {
     const filePath = resolveSqliteFile(this.config.file ?? '');
-    this.db = new Database(filePath);
+    this.db = openSqliteBackend(filePath);
   }
 
   async dispose(): Promise<void> {
@@ -85,7 +84,7 @@ export class SqliteDriver implements DbDriver {
     }
   }
 
-  private getDb(): Database {
+  private getDb(): SqliteBackend {
     if (!this.db) {
       throw new Error('SQLite に接続されていません。');
     }
@@ -189,9 +188,7 @@ export class SqliteDriver implements DbDriver {
     const columns = await this.listColumns(req.schema, req.table);
     const built = buildBrowseQuery(req, columns, this.dialect());
     const start = Date.now();
-    const rawRows = this.getDb().all(built.sql, built.params as unknown as BindValues) as unknown as Array<
-      Record<string, unknown>
-    >;
+    const rawRows = this.getDb().all(built.sql, built.params as unknown[]);
     const durationMs = Date.now() - start;
     const totalCount = await this.countRows(req.schema, req.table, req.filters ?? [], req.where);
     const rows = rawRows.map((row) => normalizeRow(columns.map((column) => row[column.name])));
@@ -206,7 +203,7 @@ export class SqliteDriver implements DbDriver {
     try {
       const columns = await this.listColumns(schema, table);
       const built = buildCountQuery(schema, table, filters, columns, this.dialect(), where);
-      const row = this.getDb().get(built.sql, built.params as unknown as BindValues) as Record<string, unknown> | null;
+      const row = this.getDb().get(built.sql, built.params as unknown[]);
       const raw = row ? row['cnt'] : null;
       const count = typeof raw === 'bigint' ? Number(raw) : Number(raw);
       return Number.isFinite(count) ? count : null;
@@ -230,7 +227,7 @@ export class SqliteDriver implements DbDriver {
     db.exec('BEGIN');
     try {
       for (const statement of statements) {
-        const result = db.run(statement.sql, statement.params as unknown as BindValues);
+        const result = db.run(statement.sql, statement.params as unknown[]);
         affected += result.changes;
       }
       db.exec('COMMIT');

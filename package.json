@@ -961,7 +961,7 @@
     "compile": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "check": "node scripts/check-mutations.mjs && node scripts/check-statements.mjs && node scripts/check-connection-comment.mjs && node scripts/check-recovery.mjs && node scripts/check-resilient.mjs && node scripts/check-export.mjs && node scripts/check-statement-kind.mjs && node scripts/check-ai-limits.mjs && node scripts/check-ai-auth.mjs && node scripts/check-approval.mjs && node scripts/check-mcp-rpc.mjs && node scripts/check-tree-filter.mjs",
+    "check": "node scripts/check-mutations.mjs && node scripts/check-statements.mjs && node scripts/check-connection-comment.mjs && node scripts/check-recovery.mjs && node scripts/check-resilient.mjs && node scripts/check-export.mjs && node scripts/check-statement-kind.mjs && node scripts/check-ai-limits.mjs && node scripts/check-ai-auth.mjs && node scripts/check-approval.mjs && node scripts/check-mcp-rpc.mjs && node scripts/check-tree-filter.mjs && node scripts/check-sqlite-backend.mjs",
     "verify": "npm run typecheck && npm run check",
     "package": "npx --yes @vscode/vsce package --allow-missing-repository",
     "install:local": "npm run package && code --install-extension db-rover-$npm_package_version.vsix --force",
