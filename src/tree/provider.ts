@@ -16,6 +16,8 @@ export class DbRoverTreeProvider implements vscode.TreeDataProvider<DbRoverNode>
    * 解除しても減らさないので、絞り込みをやめても広げたツリーはそのまま残る。
    */
   private readonly expandKeys = new Map<string, number>();
+  /** 直近に描画した接続行。絞り込みの変更でその行だけを再描画するために持つ。 */
+  private readonly connectionNodes = new Map<string, ConnectionNode>();
 
   constructor(
     private readonly manager: ConnectionManager,
@@ -26,6 +28,8 @@ export class DbRoverTreeProvider implements vscode.TreeDataProvider<DbRoverNode>
   }
 
   refresh(): void {
+    // 描き直しが終わるまで手元の接続行は古い。次の getChildren で取り直す。
+    this.connectionNodes.clear();
     this.onDidChangeTreeDataEmitter.fire();
   }
 
@@ -37,6 +41,8 @@ export class DbRoverTreeProvider implements vscode.TreeDataProvider<DbRoverNode>
   /** 絞り込みを設定する。空文字・空白のみ・undefined は解除として扱う。 */
   setFilter(connectionId: string, filter: string | undefined): void {
     const normalized = normalizeFilter(filter);
+    // 変わっていなければ描き直さない（入力欄を Esc で閉じたときなど）。
+    if (normalized === this.filters.get(connectionId)) return;
     if (normalized) {
       // 絞り込みを「始めた」ときだけ印を新しくして、畳まれたままのツリーを開き直させる。
       // 入力中（すでに絞り込み中）は据え置き。1 文字ごとに開き直すと選択位置ごと飛ぶ。
@@ -47,7 +53,15 @@ export class DbRoverTreeProvider implements vscode.TreeDataProvider<DbRoverNode>
     } else {
       this.filters.delete(connectionId);
     }
-    this.refresh();
+    // ツリー全体ではなく対象の接続行だけを描き直す。全体を描き直すと、開いたまま覚えられている
+    // 別の未接続の行まで子の取得（= 接続）が走り、つながらない接続のエラーが入力のたびに出る。
+    const node = this.connectionNodes.get(connectionId);
+    if (node) {
+      node.applyFilter(normalized);
+      this.onDidChangeTreeDataEmitter.fire(node);
+    } else {
+      this.refresh();
+    }
   }
 
   dispose(): void {
@@ -62,7 +76,7 @@ export class DbRoverTreeProvider implements vscode.TreeDataProvider<DbRoverNode>
   async getChildren(element?: DbRoverNode): Promise<DbRoverNode[]> {
     try {
       if (!element) {
-        return getConnections().map(
+        const nodes = getConnections().map(
           (config) =>
             new ConnectionNode(
               config,
@@ -71,6 +85,9 @@ export class DbRoverTreeProvider implements vscode.TreeDataProvider<DbRoverNode>
               this.filters.get(config.id),
             ),
         );
+        this.connectionNodes.clear();
+        for (const node of nodes) this.connectionNodes.set(node.config.id, node);
+        return nodes;
       }
 
       switch (element.kind) {
@@ -114,10 +131,10 @@ export class DbRoverTreeProvider implements vscode.TreeDataProvider<DbRoverNode>
           }
           if (element.groupKind === 'columns') {
             const columns = await driver.listColumns(element.schema, element.table);
-            return columns.map((column) => new ColumnNode(column));
+            return columns.map((column) => new ColumnNode(element.connectionId, column));
           }
           const indexes = await driver.listIndexes(element.schema, element.table);
-          return indexes.map((index) => new IndexNode(index));
+          return indexes.map((index) => new IndexNode(element.connectionId, index));
         }
         case 'table':
           return [

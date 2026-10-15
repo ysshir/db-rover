@@ -432,6 +432,12 @@
         "key": "ctrl+r",
         "mac": "cmd+r",
         "when": "focusedView == dbRover.connections"
+      },
+      {
+        "command": "dbRover.filterTree",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "focusedView == dbRover.connections"
       }
     ],
     "configuration": {

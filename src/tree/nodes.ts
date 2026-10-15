@@ -8,24 +8,32 @@ export class ConnectionNode extends vscode.TreeItem {
 
   constructor(
     public readonly config: ConnectionConfig,
-    connected: boolean,
+    private readonly connected: boolean,
     extensionUri: vscode.Uri,
-    public readonly filter?: string,
+    filter?: string,
   ) {
     super(config.name, connected ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.Collapsed);
     // 接続状態を id に混ぜて、切断したら「別の要素」として扱わせる。
     // 同じ id のままだと VS Code は開いた状態を覚えていて、切断直後の再描画で
     // 子の取得（= 遅延接続）が走り、切ったそばから接続し直してしまう。
     this.id = `connection:${config.id}:${connected ? 'on' : 'off'}`;
-    // 絞り込み中は contextValue の末尾に .filtered を足し、解除アイコンだけを出し分ける。
-    // menus 側は viewItem =~ /^connection\./ で受けているので、接尾辞を足しても他の項目は消えない。
-    const base = connected ? 'connection.connected' : 'connection.disconnected';
-    this.contextValue = filter ? `${base}.filtered` : base;
     // DB の種類ごとに専用アイコンを出す。未接続はグレー版に差し替える。
     // 接続状態はこのアイコンと、右に出る接続/切断アイコンで分かるので、説明には書かない。
     this.iconPath = ConnectionNode.iconFor(config.kind, connected, extensionUri);
-    this.description = filter ? `${config.kind} — 絞り込み: ${filter}` : config.kind;
-    this.tooltip = `${config.name} (${config.kind}) — ${connected ? '接続中' : '未接続'}${
+    this.applyFilter(filter);
+  }
+
+  /**
+   * 絞り込みの表示を差し替える。絞り込みの変更ではこの行だけを再描画させるため、
+   * 作り直さずに既存のノードを書き換えられるようにしている。
+   */
+  applyFilter(filter: string | undefined): void {
+    // 絞り込み中は contextValue の末尾に .filtered を足し、解除アイコンだけを出し分ける。
+    // menus 側は viewItem =~ /^connection\./ で受けているので、接尾辞を足しても他の項目は消えない。
+    const base = this.connected ? 'connection.connected' : 'connection.disconnected';
+    this.contextValue = filter ? `${base}.filtered` : base;
+    this.description = filter ? `${this.config.kind} — 絞り込み: ${filter}` : this.config.kind;
+    this.tooltip = `${this.config.name} (${this.config.kind}) — ${this.connected ? '接続中' : '未接続'}${
       filter ? `\nテーブル／ビューを「${filter}」で絞り込み中` : ''
     }`;
   }
@@ -128,7 +136,10 @@ export class TableNode extends vscode.TreeItem {
 export class ColumnNode extends vscode.TreeItem {
   readonly kind = 'column' as const;
 
-  constructor(public readonly column: ColumnMeta) {
+  constructor(
+    public readonly connectionId: string,
+    public readonly column: ColumnMeta,
+  ) {
     super(column.name, vscode.TreeItemCollapsibleState.None);
     this.contextValue = 'column';
     this.description = `${column.dataType} / ${column.nullable ? 'NULL 可' : 'NOT NULL'}${column.isPrimaryKey ? ' / PK' : ''}`;
@@ -139,7 +150,10 @@ export class ColumnNode extends vscode.TreeItem {
 export class IndexNode extends vscode.TreeItem {
   readonly kind = 'index' as const;
 
-  constructor(public readonly index: IndexMeta) {
+  constructor(
+    public readonly connectionId: string,
+    public readonly index: IndexMeta,
+  ) {
     super(index.name, vscode.TreeItemCollapsibleState.None);
     this.contextValue = 'index';
     this.description = `${index.columns.join(', ')}${index.unique ? ' / UNIQUE' : ''}${index.primary ? ' / PK' : ''}`;

@@ -120,6 +120,7 @@ export function activate(context: vscode.ExtensionContext): void {
     context,
     manager,
     treeProvider,
+    treeView,
     tableViewManager,
     connectionEditor,
     outputChannel,
@@ -256,6 +257,14 @@ async function filterConnection(treeProvider: DbRoverTreeProvider, config: Conne
   });
 }
 
+/** ツリーで選択中のノードが属する接続。選択が無い・複数の接続にまたがる場合は undefined。 */
+function connectionOfSelection(selection: readonly DbRoverNode[]): ConnectionConfig | undefined {
+  const ids = new Set(selection.map((node) => (node.kind === 'connection' ? node.config.id : node.connectionId)));
+  if (ids.size !== 1) return undefined;
+  const [id] = ids;
+  return getConnections().find((config) => config.id === id);
+}
+
 async function pickConnection(placeHolder: string): Promise<ConnectionConfig | undefined> {
   const connections = getConnections();
   if (connections.length === 0) {
@@ -273,6 +282,7 @@ function registerCommands(
   context: vscode.ExtensionContext,
   manager: ConnectionManager,
   treeProvider: DbRoverTreeProvider,
+  treeView: vscode.TreeView<DbRoverNode>,
   tableViewManager: TableViewManager,
   connectionEditor: ConnectionEditorPanel,
   outputChannel: vscode.OutputChannel,
@@ -345,12 +355,17 @@ function registerCommands(
     // ツリーの接続行にある漏斗のアイコン。入力した文字でテーブル／ビュー名を絞り込む。
     // 入力中はツリーが追従する（打ち終わるまで結果が見えないのでは絞り込みにならない）。
     vscode.commands.registerCommand('dbRover.filterTree', async (node?: ConnectionNode) => {
-      const config = node?.config ?? (await pickConnection('絞り込む接続を選択してください'));
+      // キーバインド（Cmd+F）から呼ばれたときは引数が無いので、ツリーで選択中のノードの接続を使う。
+      const config =
+        node?.config ??
+        connectionOfSelection(treeView.selection) ??
+        (await pickConnection('絞り込む接続を選択してください'));
       if (!config) return;
       try {
         // 未接続だと絞り込んだ結果を出しようがないので、先につないでおく。
+        // 新たにつないだときは manager がツリーの描き直しを通知するので、ここでは描き直さない
+        // （すでに接続中なのに全体を描き直すと、つながらない別の接続のエラーまで出る）。
         await manager.ensureConnected(config);
-        treeProvider.refresh();
       } catch (error) {
         showError(outputChannel, error, '接続に失敗しました');
         return;
