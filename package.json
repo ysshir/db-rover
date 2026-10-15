@@ -745,8 +745,8 @@
       {
         "name": "dbrover_list_connections",
         "displayName": "DB Rover: 接続一覧",
-        "userDescription": "DB Rover で現在接続中のデータベース接続を一覧します。",
-        "modelDescription": "DB Rover で現在「接続中」の接続だけを一覧します。未接続の接続は含まれません。ここで得た connectionId を他のツールに渡してください。",
+        "userDescription": "DB Rover に登録されているデータベース接続と、その接続状態を一覧します。",
+        "modelDescription": "DB Rover に登録されている接続を一覧します。available が true の接続を他のツールに渡せます（未接続なら自動で接続します）。available が false の接続は、ユーザーに DB Rover でパスワードを保存してもらう必要があります。ここで得た connectionId を他のツールに渡してください。",
         "toolReferenceName": "dbRoverConnections",
         "canBeReferencedInPrompt": true,
         "icon": "$(database)",
@@ -831,8 +831,8 @@
       {
         "name": "dbrover_run_sql",
         "displayName": "DB Rover: SQL を実行",
-        "userDescription": "DB Rover で接続中のデータベースに SQL を実行します。読み取り以外は確認が必要です。",
-        "modelDescription": "DB Rover で接続中のデータベースに SQL を実行します。読み取り以外の文はユーザーの承認が必要です。取り消せない文（DROP / TRUNCATE / WHERE 無しの DELETE・UPDATE 等）は毎回確認されます。接続 ID は dbrover_list_connections で取得してください。",
+        "userDescription": "DB Rover に登録されたデータベースに SQL を実行します。読み取り以外は確認が必要です。",
+        "modelDescription": "DB Rover に登録されたデータベースに SQL を実行します。読み取り以外の文はユーザーの承認が必要です。取り消せない文（DROP / TRUNCATE / WHERE 無しの DELETE・UPDATE 等）は毎回確認されます。接続 ID は dbrover_list_connections で取得してください。",
         "toolReferenceName": "dbRoverSql",
         "canBeReferencedInPrompt": true,
         "icon": "$(database)",

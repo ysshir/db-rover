@@ -63,7 +63,7 @@ function createTool(name: AiToolName, core: AiToolCore): vscode.LanguageModelToo
 function invocationMessageFor(name: AiToolName, connectionName: string, input: Record<string, unknown>): string {
   switch (name) {
     case 'dbrover_list_connections':
-      return 'DB Rover: 接続中の接続一覧を取得しています';
+      return 'DB Rover: 接続の一覧を取得しています';
     case 'dbrover_list_tables':
       return `DB Rover: ${connectionName} のテーブル一覧を取得しています`;
     case 'dbrover_describe_table': {

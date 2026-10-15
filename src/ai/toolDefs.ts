@@ -65,7 +65,8 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   {
     name: 'dbrover_list_connections',
     description:
-      'DB Rover で現在「接続中」の接続だけを一覧します。未接続の接続は含まれません。' +
+      'DB Rover に登録されている接続を一覧します。available が true の接続を他のツールに渡せます' +
+      '（未接続なら自動で接続します）。available が false の接続は、ユーザーに DB Rover でパスワードを保存してもらう必要があります。' +
       'ここで得た connectionId を他のツールに渡してください。',
     inputSchema: {
       type: 'object',
@@ -107,7 +108,7 @@ export const TOOL_DEFS: readonly ToolDef[] = [
   {
     name: 'dbrover_run_sql',
     description:
-      'DB Rover で接続中のデータベースに SQL を実行します。読み取り以外の文はユーザーの承認が必要です。' +
+      'DB Rover に登録されたデータベースに SQL を実行します。読み取り以外の文はユーザーの承認が必要です。' +
       '取り消せない文（DROP / TRUNCATE / WHERE 無しの DELETE・UPDATE 等）は毎回確認されます。' +
       '接続 ID は dbrover_list_connections で取得してください。',
     inputSchema: {

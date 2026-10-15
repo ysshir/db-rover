@@ -206,13 +206,20 @@ export type { AiToolName } from './ai/toolDefs.js';
 export type AiCaller = 'mcp' | 'lm';
 
 /**
- * dbrover_list_connections が返す、接続中の接続 1 件分。
+ * dbrover_list_connections が返す、登録済みの接続 1 件分。
  * パスワード（user）や SQLite の絶対パス（file）は含めない。
  */
 export interface AiConnectionInfo {
   id: string;
   name: string;
   kind: DbKind;
+  /** いまこのウィンドウで接続中か。 */
+  connected: boolean;
+  /**
+   * 他のツールに渡せるか。未接続でも SQLite かパスワード保存済みなら、ツール側が自動で接続する。
+   * false のときはユーザーにパスワードを保存してもらう必要がある。
+   */
+  available: boolean;
   database?: string;
   host?: string;
 }

@@ -8,6 +8,8 @@ import { getPassword, setPassword } from './store.js';
 /** 生きているドライバの保持・接続/切断・アクティブ接続の管理を行う。 */
 export class ConnectionManager implements vscode.Disposable {
   private readonly drivers = new Map<string, DbDriver>();
+  /** connectSilently の接続中の Promise。AI のツールが同時に呼ばれても 1 回だけ接続する。 */
+  private readonly pendingSilent = new Map<string, Promise<DbDriver>>();
   private activeId: string | undefined;
 
   private readonly onDidChangeActiveEmitter = new vscode.EventEmitter<string | undefined>();
@@ -69,6 +71,52 @@ export class ConnectionManager implements vscode.Disposable {
       }
     }
 
+    return this.openDriver(config, password);
+  }
+
+  /**
+   * 保存済みのパスワードだけを使って接続する（入力欄・選択肢は一切出さない）。
+   * AI のツールから呼ぶ。パスワードが保存されていなければ接続せずに Error を投げる。
+   */
+  async connectSilently(config: ConnectionConfig): Promise<DbDriver> {
+    const existing = this.drivers.get(config.id);
+    if (existing) {
+      return existing;
+    }
+    const pending = this.pendingSilent.get(config.id);
+    if (pending) {
+      return pending;
+    }
+    const promise = (async () => {
+      let password: string | undefined;
+      if (config.kind !== 'sqlite') {
+        password = await getPassword(this.secrets, config.id);
+        if (password === undefined) {
+          throw new Error(
+            `接続「${config.name}」はパスワードが保存されていないため、AI からは接続できません。` +
+              'DB Rover の接続編集画面でパスワードを保存するか、ツリーから接続してください。',
+          );
+        }
+      }
+      return this.openDriver(config, password);
+    })();
+    this.pendingSilent.set(config.id, promise);
+    try {
+      return await promise;
+    } finally {
+      this.pendingSilent.delete(config.id);
+    }
+  }
+
+  /** AI のツールが入力なしで接続できるか（接続中・SQLite・パスワード保存済みのいずれか）。 */
+  async canConnectSilently(config: ConnectionConfig): Promise<boolean> {
+    if (this.drivers.has(config.id) || config.kind === 'sqlite') {
+      return true;
+    }
+    return (await getPassword(this.secrets, config.id)) !== undefined;
+  }
+
+  private async openDriver(config: ConnectionConfig, password: string | undefined): Promise<DbDriver> {
     // 生のドライバではなく ResilientDriver を配る。スリープ復帰や VPN の張り直しで
     // ソケットが死んだとき（read EADDRNOTAVAIL など）、呼び出し側は何もしなくてよい。
     const driver = new ResilientDriver(createDriver(config, password), {

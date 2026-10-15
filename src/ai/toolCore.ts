@@ -26,8 +26,10 @@ export interface AiToolCallResult {
 /**
  * AI（MCP / Language Model Tool）に公開する 4 ツールの実体層。
  *
- * driver の取得は `requireDriver()` の 1 箇所に閉じ込め、`ensureConnected` / `connect` /
- * `getPassword` / `showInputBox` は絶対に呼ばない（`manager.getDriver()` のみ使う）。
+ * driver の取得は `requireDriver()` の 1 箇所に閉じ込める。未接続なら保存済みのパスワードで
+ * `manager.connectSilently()` する。`ensureConnected` / `connect` / `showInputBox` は絶対に呼ばない
+ * （AI の呼び出しをきっかけにパスワードの入力欄が出ないようにするため）。
+ * 接続をウィンドウの状態に頼らないので、どのウィンドウの MCP サーバに当たっても同じ結果になる。
  *
  * `call()` は必ず try/catch で包み、例外を外へ投げず `{ isError: true, text }` に変換する。
  */
@@ -74,7 +76,7 @@ export class AiToolCore implements vscode.Disposable {
   private async dispatch(caller: AiCaller, input: ToolInput): Promise<string> {
     switch (input._tag) {
       case 'dbrover_list_connections':
-        return JSON.stringify(this.listConnections());
+        return JSON.stringify(await this.listConnections());
       case 'dbrover_list_tables':
         return JSON.stringify(await this.listTables(input.connectionId, input.schema));
       case 'dbrover_describe_table':
@@ -88,24 +90,29 @@ export class AiToolCore implements vscode.Disposable {
     }
   }
 
-  /** 接続中の接続だけを一覧する。パスワード（user）と SQLite の絶対パス（file）は含めない。 */
-  private listConnections(): AiConnectionInfo[] {
-    return getConnections()
-      .filter((config) => this.manager.isConnected(config.id))
-      .map((config) => ({
+  /**
+   * 登録済みの接続をすべて一覧し、接続中か（connected）・ツールに渡せるか（available）を示す。
+   * パスワード（user）と SQLite の絶対パス（file）は含めない。
+   */
+  private async listConnections(): Promise<AiConnectionInfo[]> {
+    return Promise.all(
+      getConnections().map(async (config) => ({
         id: config.id,
         name: config.name,
         kind: config.kind,
+        connected: this.manager.isConnected(config.id),
+        available: await this.manager.canConnectSilently(config),
         database: config.kind === 'sqlite' ? undefined : config.database,
         host: config.kind === 'sqlite' ? undefined : config.host,
-      }));
+      })),
+    );
   }
 
   private async listTables(
     connectionId: string,
     schemaArg: string | undefined,
   ): Promise<Array<{ schema: string; tables: Array<{ name: string; type: string }> }>> {
-    const { driver } = this.requireDriver(connectionId);
+    const { driver } = await this.requireDriver(connectionId);
     const schemas = schemaArg ? [schemaArg] : await driver.listSchemas();
     const results: Array<{ schema: string; tables: Array<{ name: string; type: string }> }> = [];
     for (const schema of schemas) {
@@ -116,7 +123,7 @@ export class AiToolCore implements vscode.Disposable {
   }
 
   private async describeTable(connectionId: string, table: string, schemaArg: string | undefined) {
-    const { driver, config } = this.requireDriver(connectionId);
+    const { driver, config } = await this.requireDriver(connectionId);
     const schema = schemaArg ?? (await this.defaultSchema(driver, config));
     const [columns, indexes] = await Promise.all([
       driver.listColumns(schema, table),
@@ -146,7 +153,7 @@ export class AiToolCore implements vscode.Disposable {
     sql: string,
     maxRowsArg: number | undefined,
   ): Promise<string> {
-    const { config } = this.requireDriver(connectionId);
+    const { config } = await this.requireDriver(connectionId);
     const aiConfig = vscode.workspace.getConfiguration('dbRover');
     const maxStatements = aiConfig.get<number>('ai.maxStatements', 10);
     const maxRows = clampMaxRows(maxRowsArg, aiConfig.get<number>('ai.maxRows', 200));
@@ -258,15 +265,17 @@ export class AiToolCore implements vscode.Disposable {
     }
   }
 
-  /** driver の取得はここに閉じ込める。`ensureConnected` は使わず `manager.getDriver()` のみを使う。 */
-  private requireDriver(connectionId: string): { driver: DbDriver; config: ConnectionConfig } {
+  /**
+   * driver の取得はここに閉じ込める。未接続なら保存済みのパスワードで接続する
+   * （`ensureConnected` は入力欄を出しうるので使わない）。
+   */
+  private async requireDriver(connectionId: string): Promise<{ driver: DbDriver; config: ConnectionConfig }> {
     const config = getConnectionById(connectionId);
-    const name = config?.name ?? connectionId;
-    const driver = this.manager.getDriver(connectionId);
-    if (!driver) {
-      throw new Error(`接続「${name}」は接続されていません。DB Rover のツリーから接続してください。`);
+    if (!config) {
+      throw new Error(`接続 ID「${connectionId}」は見つかりません。dbrover_list_connections で取得し直してください。`);
     }
-    return { driver, config: config ?? { id: connectionId, name, kind: driver.kind } };
+    const driver = this.manager.getDriver(connectionId) ?? (await this.manager.connectSilently(config));
+    return { driver, config };
   }
 
   dispose(): void {
