@@ -197,13 +197,13 @@ export type ExtensionToConnectionEditorMessage =
   | { type: 'busy'; busy: boolean }
   | { type: 'status'; level: 'info' | 'error'; message: string };
 
-// --- AI 連携（MCP / Language Model Tools）関連 ---
+// --- AI 連携（Language Model Tools）関連 ---
 
 /** ツール定義の唯一の真は src/ai/toolDefs.ts。ここでは型として再輸出するだけにする。 */
 export type { AiToolName } from './ai/toolDefs.js';
 
 /** AI ツールの呼び出し元。監査ログの表示分岐・承認モーダルの文言分岐に使う。 */
-export type AiCaller = 'mcp' | 'lm';
+export type AiCaller = 'lm';
 
 /**
  * dbrover_list_connections が返す、登録済みの接続 1 件分。
@@ -241,10 +241,4 @@ export interface AiStatementPayload {
 export interface AiRunSqlPayload {
   statements: AiStatementPayload[];
   note?: string;
-}
-
-/** dbRover.ai.showStatus / ステータスバーの tooltip に使う、MCP サーバの状態。 */
-export interface AiServerStatus {
-  running: boolean;
-  port?: number;
 }

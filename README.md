@@ -59,7 +59,7 @@ npm install
 
 VS Code でこのフォルダを開き、`F5` を押すと拡張機能開発ホストが起動します（`npm run watch` が自動実行されます）。
 
-AI 連携（`contributes.mcpServerDefinitionProviders`）の関係で、対応する VS Code は `1.101.0` 以上が必要です（`engines.vscode`）。
+対応する VS Code は `1.101.0` 以上です（`engines.vscode`）。
 
 ## 接続設定の例
 
@@ -100,9 +100,7 @@ AI 連携（`contributes.mcpServerDefinitionProviders`）の関係で、対応�
   "dbRover.countRows": true,
   "dbRover.exportFormat": "csv",
   "dbRover.autoConnectOnStartup": false,
-  "dbRover.ai.mcpServer.enabled": false,
   "dbRover.ai.languageModelTools.enabled": true,
-  "dbRover.ai.port": 47600,
   "dbRover.ai.writes": "ask",
   "dbRover.ai.maxRows": 200,
   "dbRover.ai.maxStatements": 10,
@@ -179,18 +177,11 @@ DB Rover は接続が切れたことを検知して自動で張り直します�
 失われるので、明示的に `BEGIN` を書いて作業していた場合は最初からやり直してください。
 再接続の記録は出力チャンネル「DB Rover」に残ります。
 
-## AI 連携（MCP / Language Model Tools）
+## AI 連携（Language Model Tools）
 
-DB Rover に登録した接続に対して SQL を実行できる口を、AI 向けに 2 経路で公開します。接続情報（ホスト・ユーザー・パスワード）は AI に渡さず、AI が受け取るのは実行結果だけです。
+DB Rover に登録した接続に対して SQL を実行できる口を、Copilot Chat などの Language Model Tools として公開します（設定 `dbRover.ai.languageModelTools.enabled`、既定 `true`）。追加設定なしで使えます。接続情報（ホスト・ユーザー・パスワード）は AI に渡さず、AI が受け取るのは実行結果だけです。
 
-| 経路 | 対象 | 既定 | 有効化する設定 |
-| --- | --- | --- | --- |
-| Language Model Tools | VS Code 内蔵の Copilot Chat 等 | 有効 | `dbRover.ai.languageModelTools.enabled` |
-| MCP サーバ（`http://127.0.0.1` の Streamable HTTP） | Claude Code など外部の AI クライアント | 無効 | `dbRover.ai.mcpServer.enabled` |
-
-両方を有効にすると、Copilot からは同じツールが 2 系統見えて重複することがあります。通常は必要な経路だけを有効にしてください。
-
-どちらの経路でも、公開されるツールは次の 4 本です（名前・入力は共通）。
+公開されるツールは次の 4 本です。
 
 | ツール名 | 内容 |
 | --- | --- |
@@ -200,40 +191,12 @@ DB Rover に登録した接続に対して SQL を実行できる口を、AI 向
 | `dbrover_run_sql` | SQL を実行します（`;` 区切りで複数文可）。読み取り以外は承認が必要です |
 
 - 未接続の接続は、AI のツールが呼ばれたときに**保存済みのパスワードで自動的に接続**します。パスワードの入力欄は出しません。パスワードを保存していない接続（`available: false`）は、ツリーから接続しているとき以外は AI から使えません。SQLite はパスワード不要なので常に使えます。
-- VS Code のウィンドウを複数開いていると、MCP サーバはウィンドウごとに起動し、Claude Code はポートが一致したウィンドウにつながります。どのウィンドウに当たっても同じ接続を使えますが、書き込みの承認ダイアログはそのウィンドウに出ます。接続定義をワークスペース設定に保存している場合は、ウィンドウごとに見える接続が異なります。
 - 接続 ID は `dbrover_list_connections` から取得させてください。
-- `dbrover_run_sql` で読み取り（`SELECT` 等）以外の文を実行するときはモーダルの承認が必要です（設定 `dbRover.ai.writes` で挙動を変更できます）。
+- `dbrover_run_sql` で読み取り（`SELECT` 等）以外の文を実行するときは、VS Code の確認 UI に加えてモーダルの承認が必要です（設定 `dbRover.ai.writes` で挙動を変更できます）。
 - **取り消せない文**（`DROP` / `TRUNCATE` / `WHERE` 無しの `DELETE`・`UPDATE` など）は「以後確認しない」を選んでいても、**毎回**確認が入ります。
-- 実行結果は AI への応答だけでなく、既存の「クエリ結果」パネルにも `接続名（AI）` として流れます（設定 `dbRover.ai.showResults`）。何が実行されたかはここで必ず確認できます。
-- すべてのリクエスト・承認可否・実行結果は出力チャンネル「DB Rover」に記録されます（SQL 本文・行数・所要時間のみ。値そのものやトークンは記録しません）。
-
-### Claude Code などへの登録
-
-1. コマンドパレットで `DB Rover: AI 連携: MCP サーバを開始` を実行します（設定 `dbRover.ai.mcpServer.enabled` が `true` になり、ループバックアドレスのみで待ち受けを開始します）。
-2. `DB Rover: AI 連携: MCP の設定をコピー` を実行すると、`.mcp.json` にそのまま貼り付けられる JSON がクリップボードにコピーされます。これが主な登録手段です。
-3. 貼り付け先が無い、または手早く済ませたい場合は `DB Rover: AI 連携: .mcp.json に登録` を使うと、ワークスペース直下の `.mcp.json` に `mcpServers["db-rover"]` をマージして書き込みます（書き込み前に内容を確認するモーダルが出ます）。
-
-```jsonc
-// .mcp.json
-{
-  "mcpServers": {
-    "db-rover": {
-      "type": "http",
-      "url": "http://127.0.0.1:47600/mcp/<token>"
-    }
-  }
-}
-```
-
-- `.mcp.json` にはトークンが**平文で**入ります。バージョン管理に含めないでください（`DB Rover: AI 連携: .mcp.json に登録` の実行時に `.gitignore` への追記を提案します）。
-- ポートは VS Code の**ウィンドウごとに変わることがあります**（既定 `47600` が使用中なら `47609` まで空きを探し、全滅時は OS 任せのポートになります）。ウィンドウを開き直したときは登録し直してください。
-- トークンを失効させたいときは `DB Rover: AI 連携: トークンを再発行` を実行します（既存の `.mcp.json` の登録は無効になります）。
 - 接続ごとに記憶した書き込みの許可は `DB Rover: AI 連携: 書き込みの許可をリセット` で消せます。
-- 状態（起動しているか・ポート番号など）は `DB Rover: AI 連携: 状態を表示` で確認できます（トークンはマスクされます）。
-
-### Copilot Chat（Language Model Tools）
-
-`dbRover.ai.languageModelTools.enabled`（既定 `true`）が有効なら、追加設定なしで Copilot Chat から上記 4 本のツールを使えます。VS Code 自身の確認 UI が承認を挟みます。MCP サーバも同時に有効にすると、Copilot からは同じツールが 2 系統（Language Model Tools と MCP）見えることがあります。
+- 実行結果は AI への応答だけでなく、既存の「クエリ結果」パネルにも `接続名（AI）` として流れます（設定 `dbRover.ai.showResults`）。何が実行されたかはここで必ず確認できます。
+- すべてのリクエスト・承認可否・実行結果は出力チャンネル「DB Rover」に記録されます（SQL 本文・行数・所要時間のみ。値そのものは記録しません）。
 
 ## キーバインド
 
@@ -275,9 +238,7 @@ DB Rover に登録した接続に対して SQL を実行できる口を、AI 向
 - 名前をコピー
 - アクティブ接続を選択（ステータスバーの `$(database)` アイコンからも実行できます）
 - はじめに（使い方）— ようこそ画面のウォークスルーを開きます
-- AI 連携: MCP サーバを開始 / MCP サーバを停止
-- AI 連携: MCP の設定をコピー / .mcp.json に登録
-- AI 連携: 状態を表示 / トークンを再発行 / 書き込みの許可をリセット
+- AI 連携: 書き込みの許可をリセット
 
 ## SQLite の実装について
 

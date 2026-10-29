@@ -1,7 +1,7 @@
 /**
  * AI からの SQL 実行を承認するかどうかの判定と、承認モーダル・確認 UI に出す文言の生成。
  *
- * MCP 経路（showWarningMessage の modal）と LM ツール経路（prepareInvocation の
+ * ツール本体（showWarningMessage の modal）と LM ツールの確認 UI（prepareInvocation の
  * confirmationMessages）の両方が、ここの `decideApproval` / `buildApprovalPrompt` を
  * 同じ引数で呼ぶことで、判定と文言を完全に一致させる。
  *
@@ -56,7 +56,7 @@ export interface ApprovalPromptInput {
   connectionName: string;
   kinds: readonly StatementKind[];
   sql: string;
-  caller: 'mcp' | 'lm';
+  caller: 'lm';
 }
 
 export interface ApprovalPrompt {
@@ -66,7 +66,6 @@ export interface ApprovalPrompt {
 }
 
 const CALLER_LABELS: Record<ApprovalPromptInput['caller'], string> = {
-  mcp: 'MCP（外部 AI）',
   lm: 'Copilot（LM ツール）',
 };
 

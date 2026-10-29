@@ -152,36 +152,6 @@
         "category": "DB Rover"
       },
       {
-        "command": "dbRover.ai.startServer",
-        "title": "AI 連携: MCP サーバを開始",
-        "category": "DB Rover"
-      },
-      {
-        "command": "dbRover.ai.stopServer",
-        "title": "AI 連携: MCP サーバを停止",
-        "category": "DB Rover"
-      },
-      {
-        "command": "dbRover.ai.copyMcpConfig",
-        "title": "AI 連携: MCP の設定をコピー",
-        "category": "DB Rover"
-      },
-      {
-        "command": "dbRover.ai.writeMcpJson",
-        "title": "AI 連携: .mcp.json に登録",
-        "category": "DB Rover"
-      },
-      {
-        "command": "dbRover.ai.showStatus",
-        "title": "AI 連携: 状態を表示",
-        "category": "DB Rover"
-      },
-      {
-        "command": "dbRover.ai.rotateToken",
-        "title": "AI 連携: トークンを再発行",
-        "category": "DB Rover"
-      },
-      {
         "command": "dbRover.ai.resetApprovals",
         "title": "AI 連携: 書き込みの許可をリセット",
         "category": "DB Rover"
@@ -327,26 +297,6 @@
         },
         {
           "command": "dbRover.openWalkthrough"
-        },
-        {
-          "command": "dbRover.ai.startServer",
-          "when": "!dbRover.ai.serverRunning"
-        },
-        {
-          "command": "dbRover.ai.stopServer",
-          "when": "dbRover.ai.serverRunning"
-        },
-        {
-          "command": "dbRover.ai.copyMcpConfig"
-        },
-        {
-          "command": "dbRover.ai.writeMcpJson"
-        },
-        {
-          "command": "dbRover.ai.showStatus"
-        },
-        {
-          "command": "dbRover.ai.rotateToken"
         },
         {
           "command": "dbRover.ai.resetApprovals"
@@ -689,20 +639,10 @@
           "default": true,
           "description": "複数の SQL を続けて実行しているときにエラーが起きたら、以降の SQL を実行せず中断するか"
         },
-        "dbRover.ai.mcpServer.enabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "AI 連携: ローカルの MCP サーバ（Claude Code など外部 AI 向け）を起動するか。ループバックのみで待ち受けます。"
-        },
         "dbRover.ai.languageModelTools.enabled": {
           "type": "boolean",
           "default": true,
           "description": "AI 連携: Copilot Chat などの Language Model Tools として 4 つのツールを公開するか。"
-        },
-        "dbRover.ai.port": {
-          "type": "number",
-          "default": 47600,
-          "description": "AI 連携: MCP サーバの待ち受けポート。使用中なら自動で 1 つずつ空きを探し、全滅時は空きポートへ切り替えます。0 を指定すると常に空きポートを使います。"
         },
         "dbRover.ai.writes": {
           "type": "string",
@@ -865,12 +805,6 @@
         }
       }
     ],
-    "mcpServerDefinitionProviders": [
-      {
-        "id": "dbRover.mcp",
-        "label": "DB Rover"
-      }
-    ],
     "colors": [
       {
         "id": "dbRover.statementFocusBackground",
@@ -967,7 +901,7 @@
     "compile": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "check": "node scripts/check-mutations.mjs && node scripts/check-statements.mjs && node scripts/check-connection-comment.mjs && node scripts/check-recovery.mjs && node scripts/check-resilient.mjs && node scripts/check-export.mjs && node scripts/check-statement-kind.mjs && node scripts/check-ai-limits.mjs && node scripts/check-ai-auth.mjs && node scripts/check-approval.mjs && node scripts/check-mcp-rpc.mjs && node scripts/check-tree-filter.mjs && node scripts/check-sqlite-backend.mjs",
+    "check": "node scripts/check-mutations.mjs && node scripts/check-statements.mjs && node scripts/check-connection-comment.mjs && node scripts/check-recovery.mjs && node scripts/check-resilient.mjs && node scripts/check-export.mjs && node scripts/check-statement-kind.mjs && node scripts/check-ai-limits.mjs && node scripts/check-approval.mjs && node scripts/check-tree-filter.mjs && node scripts/check-sqlite-backend.mjs",
     "verify": "npm run typecheck && npm run check",
     "package": "npx --yes @vscode/vsce package --allow-missing-repository",
     "install:local": "npm run package && code --install-extension db-rover-$npm_package_version.vsix --force",

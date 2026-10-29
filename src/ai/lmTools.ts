@@ -45,7 +45,7 @@ function createTool(name: AiToolName, core: AiToolCore): vscode.LanguageModelToo
       const kinds = statements.map((statement) => classifyStatement(statement.sql));
       const invocationMessage = `DB Rover: ${connectionName} に SQL を実行しています`;
 
-      // read のみは MCP 経路と同じく無確認（decideApproval と同じ判定基準）。
+      // read のみはツール本体と同じく無確認（decideApproval と同じ判定基準）。
       const allRead = kinds.length > 0 && kinds.every((kind) => kind === 'read');
       if (allRead) {
         return { invocationMessage };

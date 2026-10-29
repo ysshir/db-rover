@@ -94,7 +94,7 @@ check('destructive のとき detail の先頭行に警告を置く', () => {
     connectionName: 'Local Postgres',
     kinds: ['destructive'],
     sql: 'DROP TABLE users',
-    caller: 'mcp',
+    caller: 'lm',
   });
   assert(prompt.destructive === true);
   const firstLine = prompt.detail.split('\n')[0];
@@ -114,19 +114,12 @@ check('read/write のときは警告行を置かない', () => {
 });
 
 check('呼び出し元ラベルが detail に含まれる', () => {
-  const mcpPrompt = buildApprovalPrompt({
-    connectionName: 'DB',
-    kinds: ['write'],
-    sql: 'INSERT INTO t VALUES (1)',
-    caller: 'mcp',
-  });
   const lmPrompt = buildApprovalPrompt({
     connectionName: 'DB',
     kinds: ['write'],
     sql: 'INSERT INTO t VALUES (1)',
     caller: 'lm',
   });
-  assert(mcpPrompt.detail.includes('MCP（外部 AI）'));
   assert(lmPrompt.detail.includes('Copilot（LM ツール）'));
 });
 

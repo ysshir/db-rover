@@ -24,20 +24,15 @@ export interface AiToolCallResult {
 }
 
 /**
- * AI（MCP / Language Model Tool）に公開する 4 ツールの実体層。
+ * AI（Language Model Tool）に公開する 4 ツールの実体層。
  *
  * driver の取得は `requireDriver()` の 1 箇所に閉じ込める。未接続なら保存済みのパスワードで
  * `manager.connectSilently()` する。`ensureConnected` / `connect` / `showInputBox` は絶対に呼ばない
  * （AI の呼び出しをきっかけにパスワードの入力欄が出ないようにするため）。
- * 接続をウィンドウの状態に頼らないので、どのウィンドウの MCP サーバに当たっても同じ結果になる。
  *
  * `call()` は必ず try/catch で包み、例外を外へ投げず `{ isError: true, text }` に変換する。
  */
-export class AiToolCore implements vscode.Disposable {
-  private busyCount = 0;
-  private readonly onDidChangeBusyEmitter = new vscode.EventEmitter<boolean>();
-  readonly onDidChangeBusy = this.onDidChangeBusyEmitter.event;
-
+export class AiToolCore {
   constructor(
     private readonly manager: ConnectionManager,
     private readonly approvalGate: ApprovalGate,
@@ -46,7 +41,6 @@ export class AiToolCore implements vscode.Disposable {
   ) {}
 
   async call(input: AiToolCallInput): Promise<AiToolCallResult> {
-    this.setBusy(true);
     try {
       const parsed = validateInput(input.name, input.args);
       const text = await this.dispatch(input.caller, parsed);
@@ -54,22 +48,6 @@ export class AiToolCore implements vscode.Disposable {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return { isError: true, text: message };
-    } finally {
-      this.setBusy(false);
-    }
-  }
-
-  private setBusy(busy: boolean): void {
-    if (busy) {
-      this.busyCount += 1;
-      if (this.busyCount === 1) {
-        this.onDidChangeBusyEmitter.fire(true);
-      }
-      return;
-    }
-    this.busyCount = Math.max(0, this.busyCount - 1);
-    if (this.busyCount === 0) {
-      this.onDidChangeBusyEmitter.fire(false);
     }
   }
 
@@ -276,10 +254,6 @@ export class AiToolCore implements vscode.Disposable {
     }
     const driver = this.manager.getDriver(connectionId) ?? (await this.manager.connectSilently(config));
     return { driver, config };
-  }
-
-  dispose(): void {
-    this.onDidChangeBusyEmitter.dispose();
   }
 }
 

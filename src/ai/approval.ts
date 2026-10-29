@@ -68,7 +68,7 @@ export class ApprovalGate implements vscode.Disposable {
     return true;
   }
 
-  /** 記憶をクリアする。`connectionId` 省略時は全件（トークン回転・コマンドから呼ぶ）。 */
+  /** 記憶をクリアする。`connectionId` 省略時は全件（コマンドから呼ぶ）。 */
   clear(connectionId?: string): void {
     if (connectionId === undefined) {
       this.remembered.clear();

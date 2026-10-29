@@ -1,6 +1,6 @@
 /**
- * AI（MCP / Language Model Tool）に公開する 4 つのツールの定義（名前・説明・入力スキーマ）と
- * 入力検証。MCP の tools/list と package.json の contributes.languageModelTools.inputSchema は
+ * AI（Language Model Tool）に公開する 4 つのツールの定義（名前・説明・入力スキーマ）と
+ * 入力検証。package.json の contributes.languageModelTools.inputSchema は
  * ここの内容と一致させる（スキーマの実体はここだけに置く）。
  *
  * vscode に依存させないこと。他の src/ai の純粋モジュールと同様、単体ビルドして検証できる状態を保つ。

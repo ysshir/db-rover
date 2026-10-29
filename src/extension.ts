@@ -26,8 +26,6 @@ import { AiIntegration } from './ai/integration.js';
 const FILTER_APPLY_DELAY_MS = 200;
 
 let statusBarItem: vscode.StatusBarItem;
-let aiIntegration: AiIntegration | undefined;
-
 export function activate(context: vscode.ExtensionContext): void {
   const outputChannel = vscode.window.createOutputChannel('DB Rover');
   context.subscriptions.push(outputChannel);
@@ -74,11 +72,8 @@ export function activate(context: vscode.ExtensionContext): void {
     }),
   );
 
-  // AI 連携（MCP サーバ + Language Model Tools）。トークン取得とサーバ起動は非同期なので、
-  // コンストラクタ（同期）で subscriptions に積んでから activate() を投げっぱなしにする。
-  aiIntegration = new AiIntegration(context, manager, outputChannel, resultView);
-  context.subscriptions.push(aiIntegration);
-  void aiIntegration.activate().catch((error) => showError(outputChannel, error, 'AI 連携の初期化に失敗しました'));
+  // AI 連携（Language Model Tools）。
+  context.subscriptions.push(new AiIntegration(manager, outputChannel, resultView));
 
   // Cmd/Ctrl+Enter で実行対象をハイライトし、Enter で実行するための状態。
   const statementFocus = new StatementFocus();
@@ -134,10 +129,7 @@ export function activate(context: vscode.ExtensionContext): void {
   }
 }
 
-export function deactivate(): Thenable<void> | undefined {
-  // MCP サーバ（node:http）を確実に閉じるため、AiIntegration の破棄を待つ。
-  return aiIntegration?.dispose();
-}
+export function deactivate(): void {}
 
 /**
  * SQL エディタを見ているときは、そのエディタの実行先（束縛）を出す。

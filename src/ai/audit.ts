@@ -2,13 +2,13 @@ import * as vscode from 'vscode';
 import type { AiCaller } from '../types.js';
 
 /**
- * AI（MCP / Language Model Tool）からの操作を記録する監査ログ。
+ * AI（Language Model Tool）からの操作を記録する監査ログ。
  *
  * 既存の出力チャンネル「DB Rover」を使い回す（新しいチャンネルは作らない）。
  * 1 行 = 1 イベント、先頭に ISO 時刻と呼び出し元タグを付ける。
  *
  * 記録するのは「要求 → 承認の可否 → 結果/エラー」の 3 点セット。
- * トークン・パスワード・結果の値そのものは絶対に書かない（行数と所要時間だけ）。
+ * パスワード・結果の値そのものは絶対に書かない（行数と所要時間だけ）。
  */
 export class AuditLog {
   constructor(private readonly outputChannel: vscode.OutputChannel) {}
@@ -49,6 +49,5 @@ export class AuditLog {
 }
 
 const CALLER_TAGS: Record<AiCaller, string> = {
-  mcp: 'AI/MCP',
   lm: 'AI/Copilot',
 };
